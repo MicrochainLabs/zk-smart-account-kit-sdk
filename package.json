@@ -31,8 +31,8 @@
     "viem":              "^2.21.0"
   },
   "peerDependencies": {
-    "@aztec/bb.js":          ">=0.63.0",
-    "@noir-lang/noir_js":    ">=1.0.0"
+    "@aztec/bb.js":          "3.0.0-nightly.20260102",
+    "@noir-lang/noir_js":    "1.0.0-beta.18"
   },
   "peerDependenciesMeta": {
     "@aztec/bb.js":       { "optional": true },

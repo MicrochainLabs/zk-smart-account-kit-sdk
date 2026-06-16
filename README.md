@@ -206,4 +206,6 @@ padded with the `NIL_PUBKEY` sentinel (secp256k1 generator point G) by
 
 ## License
 
-Apache-2.0
+MIT — see [LICENSE](LICENSE)
+
+---

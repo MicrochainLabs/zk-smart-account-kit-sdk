@@ -16,4 +16,27 @@
 export * from "./zk-label/index.js";
 export * from "./zk-signer/index.js";
 export * from "./zk-scope/index.js";
-export * from "./zk-multisig/index.js";
+
+// zk-multisig: only export members that are not already exported by zk-signer
+export {
+    MAX_SIGNERS,
+    MAX_THRESHOLD,
+    SECP256K1_G_X,
+    SECP256K1_G_Y,
+    NIL_SIGNATURE,
+    type ActiveSigner,
+    type MultiSigCircuitInput,
+    type PrivateStateValidationCircuitInput,
+    type MultiSigProofData,
+    type PrivateStateValidationProofData,
+    computeOnChainStateRoot,
+    buildMultiSigCircuitInput,
+    buildPrivateStateValidationCircuitInput,
+    encodeMultiSigInitData,
+    encodeMultiSigPublicInputs,
+    encodeUpdateStateRootData,
+    encodeMultiSigProofCalldata,
+    encodePrivateStateValidationProofCalldata,
+    generateMultiSigProof,
+    generatePrivateStateValidationProof,
+} from "./zk-multisig/index.js";
