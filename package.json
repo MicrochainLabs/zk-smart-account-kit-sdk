@@ -1,8 +1,17 @@
 {
   "name": "zk-smart-account-kit-sdk",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "TypeScript SDK for ZK primitives for smart accounts— ZK Label, ZK Signer, ZK Scope, ZK MultiSig",
-  "keywords": ["zk", "zero-knowledge", "smart-account", "noir", "erc-7579", "erc-4337", "poseidon", "merkle"],
+  "keywords": [
+    "zk",
+    "zero-knowledge",
+    "smart-account",
+    "noir",
+    "erc-7579",
+    "erc-4337",
+    "poseidon",
+    "merkle"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/microchainlabs/zk-smart-account-kit-sdk"
@@ -11,37 +20,60 @@
   "bugs": "https://github.com/microchainlabs/zk-smart-account-kit-sdk/issues",
   "type": "module",
   "exports": {
-    ".":            { "import": "./dist/index.js",            "types": "./dist/index.d.ts" },
-    "./zk-label":   { "import": "./dist/zk-label/index.js",   "types": "./dist/zk-label/index.d.ts" },
-    "./zk-signer":  { "import": "./dist/zk-signer/index.js",  "types": "./dist/zk-signer/index.d.ts" },
-    "./zk-scope":     { "import": "./dist/zk-scope/index.js",     "types": "./dist/zk-scope/index.d.ts" },
-    "./zk-multisig": { "import": "./dist/zk-multisig/index.js", "types": "./dist/zk-multisig/index.d.ts" }
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./zk-label": {
+      "import": "./dist/zk-label/index.js",
+      "types": "./dist/zk-label/index.d.ts"
+    },
+    "./zk-signer": {
+      "import": "./dist/zk-signer/index.js",
+      "types": "./dist/zk-signer/index.d.ts"
+    },
+    "./zk-scope": {
+      "import": "./dist/zk-scope/index.js",
+      "types": "./dist/zk-scope/index.d.ts"
+    },
+    "./zk-multisig": {
+      "import": "./dist/zk-multisig/index.js",
+      "types": "./dist/zk-multisig/index.d.ts"
+    }
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build":     "tsc --project tsconfig.json",
+    "build": "tsc --project tsconfig.json",
     "typecheck": "tsc --noEmit",
-    "clean":     "rm -rf dist"
+    "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@iden3/js-crypto":  "^1.0.3",
-    "@zk-kit/lean-imt":  "^2.1.0",
-    "viem":              "^2.21.0"
+    "@iden3/js-crypto": "^1.0.3",
+    "@zk-kit/lean-imt": "^2.1.0",
+    "viem": "^2.21.0"
   },
   "peerDependencies": {
-    "@aztec/bb.js":          "3.0.0-nightly.20260102",
-    "@noir-lang/noir_js":    "1.0.0-beta.18"
+    "@aztec/bb.js": "3.0.0-nightly.20260102",
+    "@noir-lang/noir_js": "1.0.0-beta.18"
   },
   "peerDependenciesMeta": {
-    "@aztec/bb.js":       { "optional": true },
-    "@noir-lang/noir_js": { "optional": true }
+    "@aztec/bb.js": {
+      "optional": true
+    },
+    "@noir-lang/noir_js": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "typescript":  "^5.5.3"
+    "typescript": "^5.5.3"
   },
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "license": "Apache-2.0"
 }
