@@ -1,11 +1,11 @@
-# @microchain/zk-sdk
+# zk-smart-account-kit-sdk
 
-TypeScript SDK for integrating Microchain ZK primitives — **ZK Label**, **ZK Signer**, and future modules — into the Microchain stack.
+TypeScript SDK for integrating smart account ZK primitives built with Noir — **ZK Label**, **ZK Scope**, **ZK Signer**, and future modules.
 
 ## Installation
 
 ```bash
-pnpm add @microchain/zk-sdk
+pnpm add zk-smart-account-kit-sdk
 ```
 
 ### Optional peer dependencies (Node.js proof generation)
@@ -14,18 +14,18 @@ pnpm add @microchain/zk-sdk
 pnpm add @aztec/bb.js @noir-lang/noir_js
 ```
 
-These are only required when calling `generateLabelBindingProof`. Browser utilities (`buildLabelsTree`, `buildLabelBindingCircuitInput`, `encodeLabelBindingPublicInputs`, etc.) work without them.
+These are only required when calling proof generation functions (`generateLabelBindingProof`, `generateZKSignerProof`, `generateScopeProof`, `generateMultiSigProof`). All tree builders, circuit input builders, and ABI helpers are browser-safe and work without peer deps.
 
 ---
 
 ## Primitives
 
-| Module              | Subpath import           | Description                                              |
-|---------------------|--------------------------|----------------------------------------------------------|
-| `zk-label`          | `@microchain/zk-sdk/zk-label`  | Private label registry: Merkle tree, circuit inputs, ABI encoding, proof generation |
-| `zk-scope`          | `@microchain/zk-sdk/zk-scope`  | Scope policy tree: rule encoding, circuit inputs, ABI encoding, proof generation |
-| `zk-signer`         | `@microchain/zk-sdk/zk-signer` | ECDSA-based ZK signer types and encoding helpers |
-| `zk-multisig`       | `@microchain/zk-sdk/zk-multisig` | M-of-N ECDSA multi-sig: signers tree, state root, circuit inputs, proof generation |
+| Module        | Subpath import                                    | Description |
+|---------------|---------------------------------------------------|-------------|
+| `zk-label`    | `zk-smart-account-kit-sdk/zk-label`    | Private label registry: Merkle tree, circuit inputs, ABI encoding, proof generation |
+| `zk-signer`   | `zk-smart-account-kit-sdk/zk-signer`   | Single-signer ECDSA ZK proofs: signers tree, circuit inputs, ABI encoding, proof generation |
+| `zk-scope`    | `zk-smart-account-kit-sdk/zk-scope`    | Scope policy tree: rule encoding, circuit inputs, ABI encoding, proof generation |
+| `zk-multisig` | `zk-smart-account-kit-sdk/zk-multisig` | M-of-N ECDSA multi-sig: signers tree, state root, circuit inputs, proof generation |
 
 ---
 
@@ -33,7 +33,7 @@ These are only required when calling `generateLabelBindingProof`. Browser utilit
 
 ### Concepts
 
-A **label** is a (name, address) pair committed as a leaf in a Poseidon Merkle tree. A user can prove label membership without revealing their address or the label name on-chain.
+A **label** is a (name, address) pair committed as a leaf in a Poseidon Merkle tree. A user can prove label membership without revealing their signer identifier such as address or the label name on-chain.
 
 ```
 leaf = Poseidon2(Poseidon1(label_name_field), Poseidon1(address_field))
@@ -44,11 +44,11 @@ root = LeanIMT root over all leaves
 
 ```ts
 import circuit from "./noir/zk_label_binding/target/zk_label_binding.json" assert { type: "json" };
-import { createZKLabels, type LabelEntry, type ZKLabels } from "@microchain/zk-sdk/zk-label";
+import { createZKLabels, type LabelEntry, type ZKLabels } from "zk-smart-account-kit-sdk/zk-label";
 
 const labels: LabelEntry[] = [
-  { labelName: "admin",  address: "0xABCDef…" },
-  { labelName: "signer", address: "0x1234AB…" },
+  { labelName: "admin",  signer: "0xABCDef…" },
+  { labelName: "member", signer: "0x1234AB…" },
 ];
 
 // Synchronous — tree is built immediately
@@ -59,6 +59,10 @@ console.log("Has admin?",     zkLabels.hasLabel("admin", "0xABCDef…"));
 
 const proofData = await zkLabels.proveLabelMembership("admin", "0xABCDef…");
 console.log("Proof:", proofData.proof);
+
+// Add / remove labels at runtime
+const newRoot = zkLabels.addLabel({ labelName: "viewer", signer: "0xDEAD…" });
+const updRoot = zkLabels.removeLabel({ labelName: "viewer", signer: "0xDEAD…" });
 ```
 
 ### Low-level API
@@ -70,7 +74,7 @@ import {
   generateLabelBindingProof,
   encodeLabelsInitData,
   encodeLabelBindingPublicInputs,
-} from "@microchain/zk-sdk/zk-label";
+} from "zk-smart-account-kit-sdk/zk-label";
 
 // 1. Build the registry Merkle tree
 const labelsTree = buildLabelsTree(labels);
@@ -98,11 +102,114 @@ const publicInputs = encodeLabelBindingPublicInputs(
 
 ## ZK Signer
 
-```ts
-import { parsePubKey, parseSignature, type PubKey } from "@microchain/zk-sdk/zk-signer";
+Proves in zero-knowledge that the prover knows the ECDSA key that signed a transaction hash **and** that the derived address is a member of a privately committed signers set.
 
-const pubkey: PubKey = parsePubKey(uncompressedBytes);   // 0x04 || x(32) || y(32)
-const sig             = parseSignature(rawBytes);         // r(32) || s(32)
+### Concepts
+
+```
+signer_leaf  = Poseidon1([address_to_field(signer)])
+signersRoot  = LeanIMT root over all signer leaves
+```
+
+### API
+
+```ts
+import circuit from "./target/zk_signers.json" assert { type: "json" };
+import {
+  buildSignersTree,
+  generateZKSignerProof,
+  encodeSignersInitData,
+  encodeZKSignerProofCalldata,
+  parsePubKey,
+  parseSignature,
+  type SignerEntry,
+  type PubKey,
+} from "zk-smart-account-kit-sdk/zk-signer";
+
+// 1. Build the signers Merkle tree
+const signers: SignerEntry[] = [
+  { signer: "0xABCDef…" },
+  { signer: "0x1234AB…" },
+];
+const signersTree = buildSignersTree(signers);
+
+// 2. Parse key material
+const pubKey: PubKey = parsePubKey(uncompressedBytes);   // 0x04 || x(32) || y(32)
+const sig            = [...parseSignature(rawBytes).r, ...parseSignature(rawBytes).s]; // 64 bytes
+
+// 3. Encode init data for module installation
+const initData = encodeSignersInitData(signersTree.signersRoot);
+
+// 4. Generate proof (Node.js only)
+const proofData = await generateZKSignerProof(
+  pubKey, sig, "0xABCDef…", signersTree, txnHashBytes, circuit,
+);
+
+// 5. Encode for on-chain submission
+const calldata = encodeZKSignerProofCalldata(proofData);
+```
+
+---
+
+## ZK Scope
+
+Restricts which transactions a smart account can approve — privately. The owner commits a set of scope rules on-chain as a Poseidon Merkle root; a transaction is approved when it matches at least one rule.
+
+### Concepts
+
+```
+params_hash = Poseidon commitment over all parameter constraints
+rule_leaf   = Poseidon4([target, selector, valueMax, params_hash])
+scopeRoot   = LeanIMT root over all rule leaves
+```
+
+### API
+
+```ts
+import circuit from "./target/zk_scope_validation.json" assert { type: "json" };
+import {
+  buildScopeTree,
+  generateScopeProof,
+  encodeScopeInitData,
+  encodeScopeProofCalldata,
+  padConstraints,
+  exactMatch,
+  rangeMax,
+  type ScopeRule,
+} from "zk-smart-account-kit-sdk/zk-scope";
+
+// 1. Define scope rules
+const rules: ScopeRule[] = [
+  {
+    target:      "0xUniswapRouter…",
+    selector:    "0xd0e30db0",
+    valueMax:    0n,
+    constraints: padConstraints([
+      exactMatch(0xA0b8n),   // tokenIn must be USDC
+      rangeMax(1_000_000n),  // amount <= 1 USDC
+    ]),
+  },
+];
+
+// 2. Build scope tree
+const scopeTree = buildScopeTree(rules);
+
+// 3. Encode init data for module installation
+const initData = encodeScopeInitData(scopeTree.scopeRoot);
+
+// 4. Generate proof (Node.js only)
+const proofData = await generateScopeProof(
+  "0xUniswapRouter…",  // txnTarget
+  "0xd0e30db0",         // txnSelector
+  0n,                    // txnValue
+  [0xA0b8n, 500_000n, 0n, 0n], // decoded calldata params
+  rules[0],              // matching rule (private)
+  scopeTree,
+  circuit,
+);
+
+// 5. Encode for on-chain submission
+const calldata = encodeScopeProofCalldata(proofData);
 ```
 
 ---
@@ -137,7 +244,7 @@ import {
   encodeMultiSigPublicInputs,
   type SignerEntry,
   type ActiveSigner,
-} from "@microchain/zk-sdk/zk-multisig";
+} from "zk-smart-account-kit-sdk/zk-multisig";
 
 // 1. Build the private signers Merkle tree
 const signers: SignerEntry[] = [
@@ -191,16 +298,27 @@ padded with the `NIL_PUBKEY` sentinel (secp256k1 generator point G) by
 
 ## Environment compatibility
 
-| Feature                             | Browser | Node.js |
-|-------------------------------------|---------|---------|
-| `buildLabelsTree`                   | ✅      | ✅      |
-| `buildLabelBindingCircuitInput`     | ✅      | ✅      |
-| `encodeLabelBindingPublicInputs`    | ✅      | ✅      |
-| `generateLabelBindingProof`         | ❌      | ✅      |
-| `generateScopeProof`                | ❌      | ✅      |
-| `generateMultiSigProof`             | ❌      | ✅      |
-| `generatePrivateStateValidationProof` | ❌    | ✅      |
-| `client.proveLabelMembership`       | ❌      | ✅      |
+| Feature                                  | Browser | Node.js |
+|------------------------------------------|---------|---------|
+| `buildLabelsTree`                        | ✅      | ✅      |
+| `buildLabelBindingCircuitInput`          | ✅      | ✅      |
+| `encodeLabelBindingPublicInputs`         | ✅      | ✅      |
+| `zkLabels.addLabel` / `removeLabel`      | ✅      | ✅      |
+| `generateLabelBindingProof`              | ❌      | ✅      |
+| `zkLabels.proveLabelMembership`          | ❌      | ✅      |
+| `buildSignersTree` (zk-signer)           | ✅      | ✅      |
+| `buildZKSignerCircuitInput`              | ✅      | ✅      |
+| `encodeSignersInitData`                  | ✅      | ✅      |
+| `generateZKSignerProof`                  | ❌      | ✅      |
+| `buildScopeTree`                         | ✅      | ✅      |
+| `buildScopeCircuitInput`                 | ✅      | ✅      |
+| `encodeScopeInitData`                    | ✅      | ✅      |
+| `generateScopeProof`                     | ❌      | ✅      |
+| `buildSignersTree` (zk-multisig)         | ✅      | ✅      |
+| `computeOnChainStateRoot`                | ✅      | ✅      |
+| `encodeMultiSigInitData`                 | ✅      | ✅      |
+| `generateMultiSigProof`                  | ❌      | ✅      |
+| `generatePrivateStateValidationProof`    | ❌      | ✅      |
 
 ---
 

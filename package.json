@@ -1,14 +1,14 @@
 {
-  "name": "@microchain/zk-smart-account-kit-sdk",
-  "version": "0.1.0",
-  "description": "TypeScript SDK for Microchain ZK primitives — ZK Label, ZK Signer, ZK Scope, ZK MultiSig",
+  "name": "zk-smart-account-kit-sdk",
+  "version": "0.1.1",
+  "description": "TypeScript SDK for ZK primitives for smart accounts— ZK Label, ZK Signer, ZK Scope, ZK MultiSig",
   "keywords": ["zk", "zero-knowledge", "smart-account", "noir", "erc-7579", "erc-4337", "poseidon", "merkle"],
   "repository": {
     "type": "git",
     "url": "https://github.com/microchainlabs/zk-smart-account-kit-sdk"
   },
-  "homepage": "https://github.com/microchainlabs/zk-smart-account-kit#readme",
-  "bugs": "https://github.com/microchainlabs/zk-smart-account-kit/issues",
+  "homepage": "https://github.com/microchainlabs/zk-smart-account-kit-sdk#readme",
+  "bugs": "https://github.com/microchainlabs/zk-smart-account-kit-sdk/issues",
   "type": "module",
   "exports": {
     ".":            { "import": "./dist/index.js",            "types": "./dist/index.d.ts" },
