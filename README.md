@@ -296,32 +296,6 @@ padded with the `NIL_PUBKEY` sentinel (secp256k1 generator point G) by
 
 ---
 
-## Environment compatibility
-
-| Feature                                  | Browser | Node.js |
-|------------------------------------------|---------|---------|
-| `buildLabelsTree`                        | ✅      | ✅      |
-| `buildLabelBindingCircuitInput`          | ✅      | ✅      |
-| `encodeLabelBindingPublicInputs`         | ✅      | ✅      |
-| `zkLabels.addLabel` / `removeLabel`      | ✅      | ✅      |
-| `generateLabelBindingProof`              | ❌      | ✅      |
-| `zkLabels.proveLabelMembership`          | ❌      | ✅      |
-| `buildSignersTree` (zk-signer)           | ✅      | ✅      |
-| `buildZKSignerCircuitInput`              | ✅      | ✅      |
-| `encodeSignersInitData`                  | ✅      | ✅      |
-| `generateZKSignerProof`                  | ❌      | ✅      |
-| `buildScopeTree`                         | ✅      | ✅      |
-| `buildScopeCircuitInput`                 | ✅      | ✅      |
-| `encodeScopeInitData`                    | ✅      | ✅      |
-| `generateScopeProof`                     | ❌      | ✅      |
-| `buildSignersTree` (zk-multisig)         | ✅      | ✅      |
-| `computeOnChainStateRoot`                | ✅      | ✅      |
-| `encodeMultiSigInitData`                 | ✅      | ✅      |
-| `generateMultiSigProof`                  | ❌      | ✅      |
-| `generatePrivateStateValidationProof`    | ❌      | ✅      |
-
----
-
 ## License
 
 MIT — see [LICENSE](LICENSE)
