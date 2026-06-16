@@ -1,0 +1,47 @@
+{
+  "name": "@microchain/zk-smart-account-kit-sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for Microchain ZK primitives — ZK Label, ZK Signer, ZK Scope, ZK MultiSig",
+  "keywords": ["zk", "zero-knowledge", "smart-account", "noir", "erc-7579", "erc-4337", "poseidon", "merkle"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/microchainlabs/zk-smart-account-kit-sdk"
+  },
+  "homepage": "https://github.com/microchainlabs/zk-smart-account-kit#readme",
+  "bugs": "https://github.com/microchainlabs/zk-smart-account-kit/issues",
+  "type": "module",
+  "exports": {
+    ".":            { "import": "./dist/index.js",            "types": "./dist/index.d.ts" },
+    "./zk-label":   { "import": "./dist/zk-label/index.js",   "types": "./dist/zk-label/index.d.ts" },
+    "./zk-signer":  { "import": "./dist/zk-signer/index.js",  "types": "./dist/zk-signer/index.d.ts" },
+    "./zk-scope":     { "import": "./dist/zk-scope/index.js",     "types": "./dist/zk-scope/index.d.ts" },
+    "./zk-multisig": { "import": "./dist/zk-multisig/index.js", "types": "./dist/zk-multisig/index.d.ts" }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build":     "tsc --project tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "clean":     "rm -rf dist"
+  },
+  "dependencies": {
+    "@iden3/js-crypto":  "^1.0.3",
+    "@zk-kit/lean-imt":  "^2.1.0",
+    "viem":              "^2.21.0"
+  },
+  "peerDependencies": {
+    "@aztec/bb.js":          ">=0.63.0",
+    "@noir-lang/noir_js":    ">=1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@aztec/bb.js":       { "optional": true },
+    "@noir-lang/noir_js": { "optional": true }
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript":  "^5.5.3"
+  },
+  "engines": { "node": ">=18" },
+  "license": "Apache-2.0"
+}
