@@ -62,8 +62,8 @@ export interface SignersTree {
 export interface SignerMerkleProof {
     /** Actual number of sibling hashes (0–4). */
     merkle_proof_length: number;
-    /** Direction bits: 0 = proved leaf is the left child, 1 = right child. */
-    merkle_proof_indices: number[];
+    /** Direction bits: false = proved leaf is the left child, true = right child. */
+    merkle_proof_indices: boolean[];
     /** Sibling hashes at each level; unused slots are "0x0". */
     merkle_proof_siblings: Hex[];
 }
@@ -111,7 +111,7 @@ export interface ZKSignerCircuitInput {
     pubkey:         { x: number[]; y: number[] };  // PubKey — secp256k1 uncompressed key
     signature:      number[];    // Signature = [u8; 64] — r(32) || s(32), low-S, no Ethereum prefix
     proof_length:   number;      // u32 — actual Merkle path depth (0 for a single-signer tree)
-    proof_index:    number[];    // [u1; SIGNERS_MAX_DEPTH] — direction bits (0 = left, 1 = right)
+    proof_index:    boolean[];   // [bool; SIGNERS_MAX_DEPTH] — direction bits (false = left, true = right)
     proof_siblings: Hex[];       // [Field; SIGNERS_MAX_DEPTH] — sibling hashes; unused slots = "0x0"
     // Public inputs
     txn_hash:     number[];  // Hash = [u8; 32] — transaction hash that was signed

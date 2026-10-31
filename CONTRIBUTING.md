@@ -41,7 +41,7 @@ pnpm typecheck
 pnpm build
 ```
 
-`@noir-lang/noir_js` and `@aztec/bb.js` are optional peer dependencies used only for proof generation. They are pinned to the versions the circuits are compiled with (`1.0.0-beta.18` and `3.0.0-nightly.20260102`); install the same versions if you work on `prove.ts` files.
+`@noir-lang/noir_js` and `@aztec/bb.js` are optional peer dependencies used only for proof generation. They are pinned to the versions the circuits are compiled with (`1.0.0-beta.22` and `5.0.0-nightly.20260522`); install the same versions if you work on `prove.ts` files.
 
 ---
 

@@ -20,7 +20,7 @@ pnpm add @aztec/bb.js @noir-lang/noir_js
 
 These are only required when calling proof generation functions (`generateLabelBindingProof`, `generateZKSignerProof`, `generateScopeProof`). All tree builders, circuit input builders, and ABI helpers are browser-safe and work without peer deps.
 
-The compiled circuit JSON files used in the examples below (for example `zk_label_binding.json`) are not bundled with this package: compile them with `nargo` from [zk-smart-account-kit](https://github.com/MicrochainLabs/zk-smart-account-kit), using Nargo `1.0.0-beta.18`.
+The compiled circuit JSON files used in the examples below (for example `zk_label_binding.json`) are not bundled with this package: compile them with `nargo` from [zk-smart-account-kit](https://github.com/MicrochainLabs/zk-smart-account-kit), using Nargo `1.0.0-beta.22`.
 
 ---
 
