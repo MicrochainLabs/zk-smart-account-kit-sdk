@@ -15,7 +15,7 @@ zk-smart-account-kit-sdk is in pre-1.0 development. Security fixes are applied t
 
 In scope:
 
-- **Tree and commitment construction** (`zk-label`, `zk-signer`, `zk-scope`, `zk-multisig`): leaf/root computation that diverges from the circuits, allowing forged or invalid commitments
+- **Tree and commitment construction** (`zk-label`, `zk-signer`, `zk-scope`): leaf/root computation that diverges from the circuits, allowing forged or invalid commitments
 - **Circuit input builders**: inputs that could cause under-constrained or incorrectly bound proofs
 - **ABI encoders**: incorrect encoding of init data, public inputs or proof calldata
 - **Proof generation helpers**: leaking private witness data (signers, labels, scope rules) outside the caller's process

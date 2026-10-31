@@ -1,7 +1,7 @@
 {
   "name": "zk-smart-account-kit-sdk",
   "version": "0.1.5",
-  "description": "TypeScript SDK for ZK primitives for smart accounts— ZK Label, ZK Signer, ZK Scope, ZK MultiSig",
+  "description": "TypeScript SDK for ZK primitives for smart accounts— ZK Label, ZK Signer, ZK Scope",
   "keywords": [
     "zk",
     "zero-knowledge",
@@ -36,10 +36,6 @@
     "./zk-scope": {
       "import": "./dist/zk-scope/index.js",
       "types": "./dist/zk-scope/index.d.ts"
-    },
-    "./zk-multisig": {
-      "import": "./dist/zk-multisig/index.js",
-      "types": "./dist/zk-multisig/index.d.ts"
     }
   },
   "main": "./dist/index.js",

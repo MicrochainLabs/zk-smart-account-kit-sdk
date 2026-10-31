@@ -11,7 +11,6 @@ assignees: ''
 - [ ] `zk-label`
 - [ ] `zk-signer`
 - [ ] `zk-scope`
-- [ ] `zk-multisig`
 - [ ] Build / packaging / types
 - [ ] Other: ___
 
