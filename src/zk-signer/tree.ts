@@ -65,9 +65,9 @@ export function getSignerMerkleProof(
     );
 
     // Decode direction bits from leaf index: bit i = direction at depth i.
-    const paddedIndices: number[] = Array.from(
+    const paddedIndices: boolean[] = Array.from(
         { length: SIGNERS_MAX_DEPTH },
-        (_, i) => (proof.index >> i) & 1,
+        (_, i) => ((proof.index >> i) & 1) === 1,
     );
 
     return {

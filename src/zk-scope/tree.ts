@@ -58,9 +58,9 @@ export function getRuleMerkleProof(
         (_, i) => (i < proof.siblings.length ? toHex(proof.siblings[i]) : "0x0") as Hex,
     );
 
-    const paddedIndices: number[] = Array.from(
+    const paddedIndices: boolean[] = Array.from(
         { length: SCOPE_MAX_DEPTH },
-        (_, i) => (proof.index >> i) & 1,
+        (_, i) => ((proof.index >> i) & 1) === 1,
     );
 
     return {

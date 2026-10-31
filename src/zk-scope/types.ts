@@ -71,7 +71,7 @@ export interface ScopeTree {
 /** Merkle membership proof for a scope rule, padded to SCOPE_MAX_DEPTH. */
 export interface ScopeMerkleProof {
     merkle_proof_length:   number;
-    merkle_proof_indices:  number[];
+    merkle_proof_indices:  boolean[];
     merkle_proof_siblings: Hex[];
 }
 
@@ -88,7 +88,7 @@ export interface ScopeCircuitInput {
     param_values:     Hex[];
     // Private: Merkle proof
     proof_length:     number;
-    proof_indices:    number[];
+    proof_indices:    boolean[];
     proof_siblings:   Hex[];
     // Public: transaction
     txn_target:        Hex;

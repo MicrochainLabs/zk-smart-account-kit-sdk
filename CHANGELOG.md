@@ -14,6 +14,8 @@ Releases are published automatically by `.github/workflows/release.yml` when the
 
 ### Changed
 
+- Upgraded the optional peer dependencies to `@noir-lang/noir_js` `1.0.0-beta.22` and `@aztec/bb.js` `5.0.0-nightly.20260522`; circuits must be compiled with Nargo `1.0.0-beta.22` (zk-smart-account-kit).
+- **Breaking:** Merkle path direction bits (`merkle_proof_indices`, `proof_index`, `proof_indices`) are now `boolean[]` instead of `number[]`, matching the `bool` circuit inputs of the upgraded circuits.
 - `LICENSE` and README now state Apache-2.0, matching `package.json` and the npm package (previously an MIT `LICENSE`).
 - Repository `version` aligned with the version published on npm (`0.1.5`; the published build is identical to the repository source).
 - Standardised on `pnpm` (removed `package-lock.json`).

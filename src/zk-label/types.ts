@@ -36,8 +36,8 @@ export interface LabelsTree {
 export interface LabelMerkleProof {
     /** Actual number of sibling hashes (0–4). */
     merkle_proof_length: number;
-    /** Direction bits: 0 = proved leaf is the left child, 1 = right child. */
-    merkle_proof_indices: number[];
+    /** Direction bits: false = proved leaf is the left child, true = right child. */
+    merkle_proof_indices: boolean[];
     /** Sibling hashes at each level; unused slots are "0x0". */
     merkle_proof_siblings: Hex[];
 }
@@ -50,7 +50,7 @@ export interface LabelBindingCircuitInput {
     address_bytes:          number[];   // [u8; 20]
     label_bytes:            number[];   // [u8; 31]
     merkle_proof_length:    number;
-    merkle_proof_indices:   number[];   // [u1; LABELS_MAX_DEPTH]
+    merkle_proof_indices:   boolean[];  // [bool; LABELS_MAX_DEPTH]
     merkle_proof_siblings:  Hex[];      // [Field; LABELS_MAX_DEPTH]
     // Public inputs
     registry_root:          Hex;        // Merkle root
