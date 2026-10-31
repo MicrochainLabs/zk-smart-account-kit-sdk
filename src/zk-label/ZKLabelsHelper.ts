@@ -7,13 +7,13 @@
  *
  * @example
  * ```ts
- * import circuit from "...zk_label_binding.json" assert { type: "json" };
- * import { createZKLabels } from "@microchain/zk-sdk/zk-label";
+ * import circuit from "...zk_label_binding.json" with { type: "json" };
+ * import { createZKLabels } from "zk-smart-account-kit-sdk/zk-label";
  *
  * const labels = createZKLabels(
  *   [
- *     { labelName: "admin",  address: "0xABCD…" },
- *     { labelName: "signer", address: "0x1234…" },
+ *     { labelName: "admin",  signer: "0xABCD…" },
+ *     { labelName: "signer", signer: "0x1234…" },
  *   ],
  *   circuit,
  * );
@@ -24,14 +24,14 @@
  */
 
 import { type Address, type Hex } from "viem";
+import { InvalidArgumentError, NotFoundError } from "../errors.js";
+import { assertCircuit } from "../internal/compiled-circuit.js";
+import type { ProveOptions } from "../internal/prover.js";
 import { computeLabelLeaf } from "./leaf.js";
 import { buildLabelsTree } from "./tree.js";
 import { computeLabelCommitment } from "./circuit.js";
-import { generateLabelBindingProof } from "./prove.js";
-import type {
-    LabelEntry,
-    LabelBindingProofData,
-} from "./types.js";
+import { generateLabelBindingProof, ZK_LABEL_BINDING_CIRCUIT_PARAMS } from "./prove.js";
+import type { LabelEntry, LabelBindingProofData } from "./types.js";
 
 // ─── Public type ───────────────────────────────────────────────────────────────
 
@@ -46,13 +46,17 @@ export type ZKLabels = {
     hasLabel(labelName: string, signer: Address): boolean;
     /**
      * Append a new label entry to the registry.
-     * Inserts the leaf into the live Merkle tree and returns the updated registryRoot.
+     * Returns the updated registryRoot. The registry is left unchanged if the entry is invalid.
+     *
+     * @throws {InvalidArgumentError} if the entry is malformed.
+     * @throws {TreeCapacityError} if the registry is already full (16 entries).
      */
     addLabel(entry: LabelEntry): Hex;
     /**
      * Remove an existing label entry from the registry.
      * Rebuilds the tree from the remaining entries and returns the updated registryRoot.
-     * @throws if the (labelName, signer) pair is not found.
+     * @throws {NotFoundError} if the (labelName, signer) pair is not found.
+     * @throws {InvalidArgumentError} if it is the last remaining entry (an empty registry has no root).
      */
     removeLabel(entry: LabelEntry): Hex;
 };
@@ -63,25 +67,27 @@ export type ZKLabels = {
  * Build the registry Merkle tree and return a ZKLabels instance.
  *
  * @param labels  - Ordered label entries (canonical ordering required for determinism).
- * @param circuit - Compiled Noir circuit artifact (parsed JSON).
+ * @param circuit - Compiled zk_label_binding artifact (parsed JSON).
+ * @param options - Optional {@link ProveOptions} applied to every proof (e.g. a shared Barretenberg instance).
+ * @throws {InvalidArgumentError} if `labels` is empty or invalid.
+ * @throws {InvalidCircuitError} if `circuit` is not the zk_label_binding artifact.
  */
-export function createZKLabels(
-    labels:  LabelEntry[],
-    circuit: unknown,
-): ZKLabels {
-    // Mutable state — mutated by addLabel / removeLabel.
+export function createZKLabels(labels: LabelEntry[], circuit: unknown, options?: ProveOptions): ZKLabels {
+    const compiled = assertCircuit(circuit, "zk_label_binding", ZK_LABEL_BINDING_CIRCUIT_PARAMS);
+
+    // Replaced wholesale on every mutation so a failed update never leaves a half-modified tree.
     const state = {
-        entries: [...labels],
-        tree:    buildLabelsTree(labels),
+        entries: labels.map(({ labelName, signer }) => ({ labelName, signer })),
+        tree: buildLabelsTree(labels),
     };
 
     const instance: ZKLabels = {
         get registryRoot(): Hex {
-            return `0x${state.tree.tree.root.toString(16)}` as Hex;
+            return `0x${state.tree.registryRoot.toString(16)}`;
         },
 
         proveLabelMembership(labelName, signer) {
-            return generateLabelBindingProof(labelName, signer, state.tree, circuit);
+            return generateLabelBindingProof(labelName, signer, state.tree, compiled, options);
         },
 
         computeLabelCommitment(labelName, signer) {
@@ -89,30 +95,28 @@ export function createZKLabels(
         },
 
         hasLabel(labelName, signer) {
-            const leaf = computeLabelLeaf(labelName, signer);
-            return state.tree.tree.indexOf(leaf) !== -1;
+            return state.tree.tree.indexOf(computeLabelLeaf(labelName, signer)) !== -1;
         },
 
         addLabel({ labelName, signer }) {
-            const leaf = computeLabelLeaf(labelName, signer);
-            state.entries.push({ labelName, signer });
-            state.tree.tree.insert(leaf);
-            state.tree.leaves.push(leaf);
-            state.tree.registryRoot = state.tree.tree.root;
+            const entries = [...state.entries, { labelName, signer }];
+            state.tree = buildLabelsTree(entries);
+            state.entries = entries;
             return instance.registryRoot;
         },
 
         removeLabel({ labelName, signer }) {
             const leaf = computeLabelLeaf(labelName, signer);
             if (state.tree.tree.indexOf(leaf) === -1) {
-                throw new Error(
-                    `Label "${labelName}" => ${signer} not found in registry.`,
-                );
+                throw new NotFoundError(`Label "${labelName}" => ${signer} not found in registry.`);
             }
-            state.entries = state.entries.filter(
-                e => !(e.labelName === labelName && e.signer === signer),
-            );
-            state.tree = buildLabelsTree(state.entries);
+            // Compare by leaf, not by string, so address casing cannot leave a stale entry behind.
+            const entries = state.entries.filter((e) => computeLabelLeaf(e.labelName, e.signer) !== leaf);
+            if (entries.length === 0) {
+                throw new InvalidArgumentError("Cannot remove the last label: an empty registry has no root.");
+            }
+            state.tree = buildLabelsTree(entries);
+            state.entries = entries;
             return instance.registryRoot;
         },
     };

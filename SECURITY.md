@@ -24,8 +24,19 @@ In scope:
 Out of scope:
 
 - Vulnerabilities in the Noir circuits or Solidity contracts — report them in [zk-smart-account-kit](https://github.com/MicrochainLabs/zk-smart-account-kit) or [microchain-zk-signers](https://github.com/MicrochainLabs/microchain-zk-signers) following their security policies
-- Upstream dependencies (viem, `@zk-kit/lean-imt`, `@iden3/js-crypto`, `@noir-lang/noir_js`, `@aztec/bb.js`) — report those upstream
+- Upstream dependencies (viem, `@noble/curves`, `@iden3/js-crypto`, `@noir-lang/noir_js`, `@aztec/bb.js`) — report those upstream
 - Theoretical attacks without a proof of concept
+
+---
+
+## Security properties of the SDK
+
+See [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) for assets, trust boundaries, mitigations and known limits.
+
+- The SDK never receives private keys; it only needs a public key and a finished signature.
+- No network access, logging or telemetry; private witness data stays in the caller's process.
+- Releases are published from CI with npm provenance, and a CycloneDX SBOM is attached to each GitHub Release.
+- Production dependencies are audited in CI (`pnpm audit --prod`), monitored by Dependabot and analysed with CodeQL.
 
 ---
 

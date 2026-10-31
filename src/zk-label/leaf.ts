@@ -6,8 +6,10 @@
  * circuit will reject.
  */
 
-import { poseidon } from "@iden3/js-crypto";
-import { toBytes, type Hex, type Address } from "viem";
+import { poseidon } from "../internal/poseidon.js";
+import { toBytes, type Address } from "viem";
+import { InvalidArgumentError } from "../errors.js";
+import { assertAddress, assertBytes } from "../internal/validation.js";
 import { LABEL_NAME_BYTES } from "./types.js";
 
 // ─── Encoding ─────────────────────────────────────────────────────────────────
@@ -18,13 +20,16 @@ import { LABEL_NAME_BYTES } from "./types.js";
  * Layout: label bytes occupy the FIRST positions (index 0 = most significant),
  * remaining bytes are zero. This matches `bytes_to_field<31>` in the Noir circuit.
  *
- * @throws if the UTF-8 encoding exceeds LABEL_NAME_BYTES (31).
+ * @throws {InvalidArgumentError} if `labelName` is not a string or its UTF-8 encoding exceeds LABEL_NAME_BYTES (31).
  */
 export function labelNameToBytes(labelName: string): number[] {
+    if (typeof labelName !== "string") {
+        throw new InvalidArgumentError("labelName must be a string.");
+    }
     const utf8 = new TextEncoder().encode(labelName);
     if (utf8.length > LABEL_NAME_BYTES) {
-        throw new RangeError(
-            `Label name "${labelName}" is ${utf8.length} bytes; max is ${LABEL_NAME_BYTES}.`
+        throw new InvalidArgumentError(
+            `Label name "${labelName}" is ${utf8.length} bytes; max is ${LABEL_NAME_BYTES}.`,
         );
     }
     const padded = new Uint8Array(LABEL_NAME_BYTES);
@@ -37,6 +42,7 @@ export function labelNameToBytes(labelName: string): number[] {
  * Matches `bytes_to_field<31>` in the Noir circuit.
  */
 export function labelBytesToField(bytes: number[]): bigint {
+    assertBytes(bytes, LABEL_NAME_BYTES, "label bytes");
     let result = 0n;
     for (const b of bytes) result = (result << 8n) | BigInt(b);
     return result;
@@ -55,6 +61,7 @@ export function labelNameToField(labelName: string): bigint {
  * Safe because 2^160 < BN254 field modulus.
  */
 export function addressToField(signer: Address): bigint {
+    assertAddress(signer, "signer");
     return BigInt(signer.toLowerCase());
 }
 
@@ -71,10 +78,10 @@ export function addressToField(signer: Address): bigint {
  * The double-hash prevents independent brute-forcing of either input.
  */
 export function computeLabelLeaf(labelName: string, signer: Address): bigint {
-    const labelField   = labelNameToField(labelName);
-    const signerField  = addressToField(signer);
-    const labelHash    = poseidon.hash([labelField]);
-    const signerHash   = poseidon.hash([signerField]);
+    const labelField = labelNameToField(labelName);
+    const signerField = addressToField(signer);
+    const labelHash = poseidon.hash([labelField]);
+    const signerHash = poseidon.hash([signerField]);
     return poseidon.hash([labelHash, signerHash]);
 }
 
@@ -90,5 +97,6 @@ export function labelsHash(a: bigint, b: bigint): bigint {
  * Encode a signer address as a byte array. Used for the circuit's address_bytes input.
  */
 export function addressToBytes(signer: Address): number[] {
-    return Array.from(toBytes(signer as Hex));
+    assertAddress(signer, "signer");
+    return Array.from(toBytes(signer));
 }

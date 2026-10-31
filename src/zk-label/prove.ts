@@ -21,12 +21,24 @@
  */
 
 import { buildLabelBindingCircuitInput } from "./circuit.js";
-import { toHex, type Address, type Hex } from "viem";
+import { assertCircuit } from "../internal/compiled-circuit.js";
+import { proveCircuit, type ProveOptions } from "../internal/prover.js";
+import type { Address } from "viem";
 import type { LabelsTree, LabelBindingProofData } from "./types.js";
 
-// Dynamically imported peer deps — kept as type-only to avoid hard dep at build time.
-type UltraHonkBackend = import("@aztec/bb.js").UltraHonkBackend;
-type NoirInstance = InstanceType<typeof import("@noir-lang/noir_js").Noir>;
+/** Parameter names of the `zk_label_binding` circuit, in ABI order. */
+export const ZK_LABEL_BINDING_CIRCUIT_PARAMS = [
+    "address_bytes",
+    "label_bytes",
+    "merkle_proof_length",
+    "merkle_proof_indices",
+    "merkle_proof_siblings",
+    "registry_root",
+    "label_commitment",
+] as const;
+
+/** registry_root + label_commitment. */
+const PUBLIC_INPUT_COUNT = 2;
 
 /**
  * Generate a ZK Label membership proof.
@@ -34,44 +46,36 @@ type NoirInstance = InstanceType<typeof import("@noir-lang/noir_js").Noir>;
  * @param labelName   - Label name (max 31 bytes UTF-8).
  * @param signer      - Ethereum address (signer) bound to the label.
  * @param labelsTree  - Registry tree returned by `buildLabelsTree`.
- * @param circuit     - Compiled Noir circuit artifact (parsed JSON).
+ * @param circuit     - Compiled zk_label_binding artifact (parsed JSON).
+ * @param options     - Optional {@link ProveOptions} (e.g. a shared Barretenberg instance).
  * @returns Proof bytes and public inputs, ready for on-chain submission.
+ * @throws {InvalidArgumentError} on malformed inputs.
+ * @throws {NotFoundError} if the (label, signer) pair is not in the tree.
+ * @throws {InvalidCircuitError} if `circuit` is not the zk_label_binding artifact.
+ * @throws {MissingPeerDependencyError} if the proving peer dependencies are not installed.
+ * @throws {ProofGenerationError} if witness execution or proving fails.
  */
 export async function generateLabelBindingProof(
-    labelName:   string,
-    signer:      Address,
-    labelsTree:  LabelsTree,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    circuit:     any,
+    labelName: string,
+    signer: Address,
+    labelsTree: LabelsTree,
+    circuit: unknown,
+    options?: ProveOptions,
 ): Promise<LabelBindingProofData> {
-    // Lazy-load the heavy peer deps at call time.
-    const [{ UltraHonkBackend }, { Noir }] = await Promise.all([
-        import("@aztec/bb.js"),
-        import("@noir-lang/noir_js"),
-    ]);
+    const compiled = assertCircuit(circuit, "zk_label_binding", ZK_LABEL_BINDING_CIRCUIT_PARAMS);
+    const circuitInput = buildLabelBindingCircuitInput(labelName, signer, labelsTree.tree, labelsTree.registryRoot);
 
-    const circuitInput = buildLabelBindingCircuitInput(
-        labelName,
-        signer,
-        labelsTree.tree,
-        labelsTree.registryRoot,
+    const { proof, publicInputs } = await proveCircuit(
+        compiled,
+        circuitInput as unknown as Record<string, unknown>,
+        PUBLIC_INPUT_COUNT,
+        options,
     );
 
-    const { Barretenberg } = await import("@aztec/bb.js");
-    const api     = await Barretenberg.new();
-    const backend = new UltraHonkBackend(circuit.bytecode, api) as UltraHonkBackend;
-    const noir    = new Noir(circuit) as NoirInstance;
-
-    const { witness }      = await noir.execute(circuitInput);
-    const { proof, publicInputs } = await backend.generateProof(witness);
-
-    const registryRoot    = publicInputs[0] as Hex;
-    const labelCommitment = publicInputs[1] as Hex;
-
     return {
-        proof:           toHex(proof) as Hex,
-        publicInputs:    publicInputs as Hex[],
-        registryRoot,
-        labelCommitment,
+        proof,
+        publicInputs,
+        registryRoot: publicInputs[0],
+        labelCommitment: publicInputs[1],
     };
 }

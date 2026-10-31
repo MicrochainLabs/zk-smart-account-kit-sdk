@@ -25,7 +25,7 @@ This project follows the [Contributor Covenant](./CODE_OF_CONDUCT.md). By partic
 
 | Tool | Version |
 |---|---|
-| [Node.js](https://nodejs.org/) | 18+ |
+| [Node.js](https://nodejs.org/) | 20.19+ |
 | [pnpm](https://pnpm.io/) | 10 |
 | Git | any |
 
@@ -37,9 +37,20 @@ This project follows the [Contributor Covenant](./CODE_OF_CONDUCT.md). By partic
 git clone https://github.com/MicrochainLabs/zk-smart-account-kit-sdk.git
 cd zk-smart-account-kit-sdk
 pnpm install
-pnpm typecheck
-pnpm build
+pnpm verify
 ```
+
+`pnpm verify` runs everything CI runs: typecheck, lint, format check, the full test suite with coverage thresholds, the ESM + CJS build, package lint (`publint`, `are-the-types-wrong`), the API docs build and an install/import smoke test. A pre-commit hook (husky + lint-staged) formats and lints staged files.
+
+Useful scripts:
+
+| Script | Purpose |
+|---|---|
+| `pnpm test` / `pnpm test:unit` / `pnpm test:e2e` | all tests / fast unit tests / end-to-end proof tests |
+| `pnpm test:coverage` | tests with coverage thresholds (what CI runs) |
+| `pnpm sync-circuits [path]` | refresh `test/fixtures/circuits` from a compiled zk-smart-account-kit checkout |
+| `pnpm docs:api` | generate API docs into `docs/api` |
+| `pnpm audit:deps` | dependency audit |
 
 `@noir-lang/noir_js` and `@aztec/bb.js` are optional peer dependencies used only for proof generation. They are pinned to the versions the circuits are compiled with (`1.0.0-beta.22` and `5.0.0-nightly.20260522`); install the same versions if you work on `prove.ts` files.
 
@@ -52,8 +63,13 @@ src/
   zk-label/       Private label registry
   zk-signer/      Single-signer ECDSA proofs
   zk-scope/       Scope policy tree and rules
+  internal/       Shared, non-public code: validation, Merkle tree, prover, Poseidon facade
+  errors.ts       Typed errors
   index.ts        Root re-exports
-  ambient.d.ts    Type stubs for optional peer dependencies
+test/             Unit tests; test/e2e runs the real circuits; test/fixtures/circuits holds compiled artifacts
+examples/         Runnable examples (executed by the test suite)
+docs/             Threat model, compatibility, versioning policy
+scripts/          Build, circuit sync, install smoke test
 ```
 
 Each primitive follows the same layout: `types.ts`, `tree.ts`, `circuit.ts`, `abi.ts`, `prove.ts`, `index.ts`.
@@ -62,13 +78,19 @@ Each primitive follows the same layout: `types.ts`, `tree.ts`, `circuit.ts`, `ab
 
 ## Making Changes
 
-- The SDK is ESM-only and strict TypeScript; match the surrounding style.
+- The SDK is strict TypeScript, built for both ESM and CommonJS; match the surrounding style (Prettier and ESLint enforce it).
 - Tree, leaf and hash logic **must** stay byte-for-byte compatible with the Noir circuits. Any change here is potentially breaking and needs a discussion issue first.
 - Tree builders, circuit input builders and ABI helpers must stay browser-safe: do not import Node.js-only modules in them. Only `prove.ts` files may depend on the optional peer dependencies.
 - Adding a new primitive: create `src/<name>/` with the layout above, re-export it from `src/index.ts` and add a `"./<name>"` entry to `exports` in `package.json`.
+- Validate every public input at runtime and throw a typed error from `src/errors.ts` (never a bare `Error`).
 - Update the README and `CHANGELOG.md` (under `[Unreleased]`) for user-facing changes.
 
-There is no automated test suite yet — adding unit tests for the tree and encoding helpers is a very welcome contribution.
+### Tests
+
+- Every change needs tests. Coverage thresholds are enforced in `vitest.config.ts` and must not be lowered.
+- Anything that affects a leaf, root, circuit input or calldata byte needs an **end-to-end test** in `test/e2e` proving the real circuit still accepts the SDK's output, plus a golden vector where one exists in the circuit tests.
+- After recompiling circuits, run `pnpm sync-circuits` and review the `manifest.json` diff.
+- Follow [docs/VERSIONING.md](docs/VERSIONING.md) when deciding the version bump and deprecations.
 
 ---
 
@@ -95,7 +117,7 @@ Security issues must **not** be reported through public PRs; see [SECURITY.md](.
    git checkout -b feat/your-feature-name
    ```
 2. Make your changes with clear commit messages (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
-3. Make sure `pnpm typecheck` and `pnpm build` pass (CI runs both on Node 18, 20 and 22).
+3. Make sure `pnpm verify` passes (CI runs the same checks, with tests on Node 20, 22 and 24 and a package smoke test on the same versions).
 4. Open a PR against `develop` and fill in the pull request template.
 5. A maintainer will review and may request changes.
 

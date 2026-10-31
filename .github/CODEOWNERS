@@ -1,0 +1,15 @@
+# Changes to these paths affect on-chain compatibility or the supply chain; require a code-owner review.
+# Replace the team handles with the real GitHub team/user slugs of your organisation.
+
+*                          @MicrochainLabs/sdk-maintainers
+
+/src/internal/             @MicrochainLabs/sdk-maintainers @MicrochainLabs/security
+/src/**/leaf.ts            @MicrochainLabs/sdk-maintainers @MicrochainLabs/security
+/src/**/rule.ts            @MicrochainLabs/sdk-maintainers @MicrochainLabs/security
+/src/**/tree.ts            @MicrochainLabs/sdk-maintainers @MicrochainLabs/security
+/src/**/abi.ts             @MicrochainLabs/sdk-maintainers @MicrochainLabs/security
+/test/fixtures/            @MicrochainLabs/sdk-maintainers @MicrochainLabs/security
+/.github/                  @MicrochainLabs/sdk-maintainers @MicrochainLabs/security
+/package.json              @MicrochainLabs/sdk-maintainers @MicrochainLabs/security
+/pnpm-lock.yaml            @MicrochainLabs/sdk-maintainers @MicrochainLabs/security
+/SECURITY.md               @MicrochainLabs/security

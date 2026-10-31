@@ -1,5 +1,5 @@
 /**
- * @microchain/zk-sdk — zk-scope subpath
+ * zk-smart-account-kit-sdk — zk-scope subpath
  *
  * Rule encoding, tree construction, circuit input building, and ABI helpers
  * are browser-safe. Import `./prove.js` for proof generation (Node.js only).
@@ -39,10 +39,7 @@ export {
 export { buildScopeTree, getRuleMerkleProof } from "./tree.js";
 
 // Circuit input builder (browser-safe)
-export {
-    buildScopeCircuitInput,
-    buildScopeCircuitInputFromProof,
-} from "./circuit.js";
+export { buildScopeCircuitInput, buildScopeCircuitInputFromProof } from "./circuit.js";
 
 // ABI encoding (browser-safe)
 export {
@@ -54,4 +51,5 @@ export {
 } from "./abi.js";
 
 // Proof generation (Node.js, requires peer deps)
+export type { ProveOptions, BarretenbergLike } from "../internal/prover.js";
 export { generateScopeProof } from "./prove.js";

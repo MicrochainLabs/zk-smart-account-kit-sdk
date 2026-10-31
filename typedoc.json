@@ -1,0 +1,13 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/zk-signer/index.ts", "src/zk-label/index.ts", "src/zk-scope/index.ts", "src/errors.ts"],
+  "tsconfig": "tsconfig.build.json",
+  "out": "docs/api",
+  "name": "zk-smart-account-kit-sdk",
+  "readme": "README.md",
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "navigation": { "includeCategories": false, "includeGroups": true },
+  "validation": { "invalidLink": true, "notExported": false },
+  "treatWarningsAsErrors": true
+}
