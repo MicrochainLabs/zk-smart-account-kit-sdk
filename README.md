@@ -1,5 +1,9 @@
 # zk-smart-account-kit-sdk
 
+[![CI](https://github.com/MicrochainLabs/zk-smart-account-kit-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/MicrochainLabs/zk-smart-account-kit-sdk/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/zk-smart-account-kit-sdk.svg)](https://www.npmjs.com/package/zk-smart-account-kit-sdk)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
 TypeScript SDK for integrating smart account ZK primitives built with Noir — **ZK Label**, **ZK Scope**, **ZK Signer**, and future modules.
 
 ## Installation
@@ -15,6 +19,8 @@ pnpm add @aztec/bb.js @noir-lang/noir_js
 ```
 
 These are only required when calling proof generation functions (`generateLabelBindingProof`, `generateZKSignerProof`, `generateScopeProof`, `generateMultiSigProof`). All tree builders, circuit input builders, and ABI helpers are browser-safe and work without peer deps.
+
+The compiled circuit JSON files used in the examples below (for example `zk_label_binding.json`) are not bundled with this package: compile them with `nargo` from [zk-smart-account-kit](https://github.com/MicrochainLabs/zk-smart-account-kit) (`zk-label`, `zk-signer`, `zk-scope`) or [microchain-zk-signers](https://github.com/MicrochainLabs/microchain-zk-signers) (`zk-multisig`), using Nargo `1.0.0-beta.18`.
 
 ---
 
@@ -298,6 +304,10 @@ padded with the `NIL_PUBKEY` sentinel (secp256k1 generator point G) by
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+Apache-2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+## Contributing & Security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md). Release history is in [CHANGELOG.md](CHANGELOG.md).
 
 ---

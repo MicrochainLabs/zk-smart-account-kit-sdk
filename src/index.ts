@@ -1,16 +1,16 @@
 /**
- * @microchain/zk-sdk
+ * zk-smart-account-kit-sdk
  *
  * Unified TypeScript SDK for Microchain ZK primitives.
  *
  * Subpath imports give tree-shakeable, granular access:
  *
- *   import { buildLabelsTree, ZKLabelsHelper } from "@microchain/zk-sdk/zk-label";
- *   import { parsePubKey, type PubKey }        from "@microchain/zk-sdk/zk-signer";
+ *   import { buildLabelsTree, ZKLabelsHelper } from "zk-smart-account-kit-sdk/zk-label";
+ *   import { parsePubKey, type PubKey }        from "zk-smart-account-kit-sdk/zk-signer";
  *
  * The root import re-exports every primitive for convenience:
  *
- *   import { buildLabelsTree, parsePubKey } from "@microchain/zk-sdk";
+ *   import { buildLabelsTree, parsePubKey } from "zk-smart-account-kit-sdk";
  */
 
 export * from "./zk-label/index.js";
