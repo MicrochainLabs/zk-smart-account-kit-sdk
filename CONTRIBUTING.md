@@ -25,7 +25,7 @@ This project follows the [Contributor Covenant](./CODE_OF_CONDUCT.md). By partic
 
 | Tool | Version |
 |---|---|
-| [Node.js](https://nodejs.org/) | 20+ for development (the published package supports 18+) |
+| [Node.js](https://nodejs.org/) | 20.19+ |
 | [pnpm](https://pnpm.io/) | 10 |
 | Git | any |
 
@@ -117,7 +117,7 @@ Security issues must **not** be reported through public PRs; see [SECURITY.md](.
    git checkout -b feat/your-feature-name
    ```
 2. Make your changes with clear commit messages (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
-3. Make sure `pnpm verify` passes (CI runs the same checks, with tests on Node 20, 22 and 24 and a package smoke test on Node 18–24).
+3. Make sure `pnpm verify` passes (CI runs the same checks, with tests on Node 20, 22 and 24 and a package smoke test on the same versions).
 4. Open a PR against `develop` and fill in the pull request template.
 5. A maintainer will review and may request changes.
 

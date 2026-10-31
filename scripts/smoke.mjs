@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// import.meta.dirname is unavailable on Node 18, which this script must run on.
+// import.meta.dirname needs Node 20.11+; this script runs with only the oldest supported Node and no dev dependencies.
 const root = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const work = mkdtempSync(join(tmpdir(), "zk-sdk-smoke-"));
 const run = (cmd, args, cwd) =>

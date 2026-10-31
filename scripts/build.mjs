@@ -37,7 +37,7 @@ await build({
     bundle: false,
     format: "cjs",
     platform: "node",
-    target: "node18",
+    target: "node20",
     sourcemap: true,
     sourcesContent: true,
     logLevel: "warning",

@@ -4,8 +4,8 @@
 
 | Component | Version | Verified by |
 |---|---|---|
-| Node.js (tree/input/ABI helpers, ESM + CJS) | 18, 20, 22, 24 | CI `smoke` job installs the packed tarball on each version |
-| Node.js (proof generation) | 20, 22, 24 | CI `test` job runs the end-to-end proof suite on each version |
+| Node.js (everything, ESM + CJS) | 20.19+, 22, 24 | CI `smoke` job installs the packed tarball on each version; CI `test` job runs the end-to-end proof suite on each |
+| Node.js 18 | **not supported** | `@iden3/js-crypto` fails on import (no global `crypto`, ESM build) and `@noble/hashes@2` requires Node ≥ 20.19. This was already the case for 0.1.x; the `engines` field previously over-promised. |
 | Browsers / bundlers | tree, input and ABI helpers only (no Node built-ins); proving is Node-only | `attw` + `publint` in CI |
 | Module formats | ESM (`import`) and CommonJS (`require`), with types for both | `attw --profile node16` in CI |
 

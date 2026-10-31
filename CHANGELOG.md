@@ -32,7 +32,7 @@ Releases are published automatically by `.github/workflows/release.yml` when the
 - `ProveOptions.barretenberg` to reuse one Barretenberg instance across proofs; `MerkleTreeLike`, `LeanIMT`, `CompiledCircuit` types.
 - Test suite: unit tests with coverage thresholds, golden vectors from the Noir tests, differential tests against `@zk-kit/lean-imt`, and end-to-end tests that run the real compiled circuits (witness, prove, verify) for every primitive.
 - ESLint (type-aware), Prettier, husky + lint-staged pre-commit hook, TypeDoc API docs, runnable `examples/`.
-- CI: lint, format, tests with coverage on Node 20/22/24, build + package lint, install/import smoke test on Node 18/20/22/24, dependency audit, CodeQL, informational compatibility job against the latest stable `@aztec/bb.js`; Dependabot; CODEOWNERS; CycloneDX SBOM attached to every GitHub Release.
+- CI: lint, format, tests with coverage on Node 20/22/24, build + package lint, install/import smoke test on Node 20/22/24, dependency audit, CodeQL, informational compatibility job against the latest stable `@aztec/bb.js`; Dependabot; CODEOWNERS; CycloneDX SBOM attached to every GitHub Release.
 - `docs/`: threat model, compatibility matrix, versioning and deprecation policy.
 - GitHub Actions release workflow (GitHub Release and npm publish with provenance).
 - `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `NOTICE`, issue and pull request templates, README badges.
@@ -44,6 +44,7 @@ Releases are published automatically by `.github/workflows/release.yml` when the
 - **Breaking:** `buildSignersTree`, `buildLabelsTree`, `buildScopeTree` and `createZKLabels` reject empty and over-capacity inputs; `removeLabel` refuses to remove the last label (an empty registry has no root).
 - **Breaking:** `parseSignature` accepts exactly 64 or 65 bytes (previously any length ≥ 64); `padConstraints`/`padParamValues` throw on more than 4 entries; `computeRuleLeaf` rejects `valueMax`/range bounds above `2^128 − 1`.
 - **Breaking:** `generate*Proof` take `circuit: unknown` (validated) plus an optional trailing `options`; `createZKLabels(labels, circuit, options?)`.
+- **Breaking:** `engines.node` is now `>=20.19.0`. Node 18 never worked for the ESM build (`@iden3/js-crypto` throws on import, and `@noble/hashes@2` requires Node ≥ 20.19); the previous `>=18` was incorrect.
 - **Breaking:** `package.json` `exports` now point to `dist/esm` / `dist/cjs`; deep imports of `dist/*` no longer work.
 - Removed the `@zk-kit/lean-imt` dependency (see Security); `@noble/curves` is now a direct dependency (signature pre-flight).
 - `@aztec/bb.js` and `@noir-lang/noir_js` are also dev dependencies, so the real typings and the end-to-end tests are used; `src/ambient.d.ts` is removed.

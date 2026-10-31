@@ -12,7 +12,7 @@ TypeScript SDK for integrating smart account ZK primitives built with Noir — *
 pnpm add zk-smart-account-kit-sdk
 ```
 
-The package ships ESM and CommonJS builds with types for both. Node.js 18+ is supported (proof generation is verified on Node 20+ — see [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)).
+The package ships ESM and CommonJS builds with types for both. Node.js **20.19+** is required (`@iden3/js-crypto` and `@noble/hashes` do not load on Node 18) — see [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ### Optional peer dependencies (Node.js proof generation)
 
