@@ -1,8 +1,8 @@
 /**
  * ABI encoding helpers for on-chain interactions with ZK Label validators.
  *
- * These match the calldata layout expected by ZKMultiSigEcdsaSingleton and
- * ZKMultiSigValidator (ERC-7579). Browser-safe: no proving deps required.
+ * These match the calldata layout expected by the ZK Label validator (ERC-7579).
+ * Browser-safe: no proving deps required.
  */
 
 import {
@@ -35,7 +35,7 @@ export function encodeLabelBindingPublicInputs(
 
 /**
  * Encode the initialisation calldata passed to the validator during module
- * installation (ZKMultiSigValidator.onInstall / initData).
+ * installation (ZK Label validator onInstall / initData).
  *
  * Layout: abi.encode(bytes32 registryRoot)
  */

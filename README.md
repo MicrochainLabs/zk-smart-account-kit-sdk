@@ -18,9 +18,9 @@ pnpm add zk-smart-account-kit-sdk
 pnpm add @aztec/bb.js @noir-lang/noir_js
 ```
 
-These are only required when calling proof generation functions (`generateLabelBindingProof`, `generateZKSignerProof`, `generateScopeProof`, `generateMultiSigProof`). All tree builders, circuit input builders, and ABI helpers are browser-safe and work without peer deps.
+These are only required when calling proof generation functions (`generateLabelBindingProof`, `generateZKSignerProof`, `generateScopeProof`). All tree builders, circuit input builders, and ABI helpers are browser-safe and work without peer deps.
 
-The compiled circuit JSON files used in the examples below (for example `zk_label_binding.json`) are not bundled with this package: compile them with `nargo` from [zk-smart-account-kit](https://github.com/MicrochainLabs/zk-smart-account-kit) (`zk-label`, `zk-signer`, `zk-scope`) or [microchain-zk-signers](https://github.com/MicrochainLabs/microchain-zk-signers) (`zk-multisig`), using Nargo `1.0.0-beta.18`.
+The compiled circuit JSON files used in the examples below (for example `zk_label_binding.json`) are not bundled with this package: compile them with `nargo` from [zk-smart-account-kit](https://github.com/MicrochainLabs/zk-smart-account-kit), using Nargo `1.0.0-beta.18`.
 
 ---
 
@@ -31,7 +31,6 @@ The compiled circuit JSON files used in the examples below (for example `zk_labe
 | `zk-label`    | `zk-smart-account-kit-sdk/zk-label`    | Private label registry: Merkle tree, circuit inputs, ABI encoding, proof generation |
 | `zk-signer`   | `zk-smart-account-kit-sdk/zk-signer`   | Single-signer ECDSA ZK proofs: signers tree, circuit inputs, ABI encoding, proof generation |
 | `zk-scope`    | `zk-smart-account-kit-sdk/zk-scope`    | Scope policy tree: rule encoding, circuit inputs, ABI encoding, proof generation |
-| `zk-multisig` | `zk-smart-account-kit-sdk/zk-multisig` | M-of-N ECDSA multi-sig: signers tree, state root, circuit inputs, proof generation |
 
 ---
 
@@ -217,80 +216,6 @@ const proofData = await generateScopeProof(
 // 5. Encode for on-chain submission
 const calldata = encodeScopeProofCalldata(proofData);
 ```
-
----
-
-## ZK MultiSig
-
-### Concepts
-
-An M-of-N threshold scheme where a set of ECDSA signers is committed privately
-as a Poseidon Merkle tree. The on-chain state root commits to both the signer
-tree root and the threshold:
-
-```
-signer_leaf     = Poseidon1([address_as_field])
-signers_root    = LeanIMT root over all signer leaves
-threshold_hash  = Poseidon1([threshold])
-on_chain_state_root = Poseidon2([signers_root, threshold_hash])
-```
-
-### Low-level API
-
-```ts
-import multiSigCircuit    from "./zk_multi_sig_ecdsa.json" assert { type: "json" };
-import validationCircuit  from "./zk_multi_sig_ecdsa_private_state_validation.json" assert { type: "json" };
-import {
-  buildSignersTree,
-  computeOnChainStateRoot,
-  buildMultiSigCircuitInput,
-  generateMultiSigProof,
-  generatePrivateStateValidationProof,
-  encodeMultiSigInitData,
-  encodeMultiSigPublicInputs,
-  type SignerEntry,
-  type ActiveSigner,
-} from "zk-smart-account-kit-sdk/zk-multisig";
-
-// 1. Build the private signers Merkle tree
-const signers: SignerEntry[] = [
-  { address: "0xABCDef…" },
-  { address: "0x1234AB…" },
-];
-const signersTree = buildSignersTree(signers);
-const threshold = 2;
-
-// 2. Compute the on-chain state root (public commitment)
-const stateRoot = computeOnChainStateRoot(signersTree.signersRoot, threshold);
-console.log("State root:", stateRoot);
-
-// 3. Encode init data for module installation
-const initData = encodeMultiSigInitData(stateRoot);
-
-// 4. Generate a multi-sig proof (Node.js only)
-//    activeSigners MUST be sorted by address ascending
-const activeSigners: ActiveSigner[] = [
-  { pubKey: pubKey1, signature: sig1, address: "0xABCDef…" },
-  { pubKey: pubKey2, signature: sig2, address: "0x1234AB…" },
-];
-const proofData = await generateMultiSigProof(
-  activeSigners, threshold, signersTree, txnHashBytes, multiSigCircuit,
-);
-
-// 5. Encode for on-chain submission
-const publicInputs = encodeMultiSigPublicInputs(proofData.txnHash, proofData.onChainStateRoot);
-
-// 6. Prove state root validity without signature verification
-const validationProof = await generatePrivateStateValidationProof(
-  signersTree.signersRoot, threshold, validationCircuit,
-);
-```
-
-### NIL signer padding
-
-The circuit has `MAX_SIGNERS = 5` fixed slots. Inactive slots are automatically
-padded with the `NIL_PUBKEY` sentinel (secp256k1 generator point G) by
-`buildMultiSigCircuitInput`. You only need to provide the active signers.
 
 ---
 

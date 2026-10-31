@@ -25,7 +25,6 @@ assignees: ''
 - [ ] `zk-label`
 - [ ] `zk-signer`
 - [ ] `zk-scope`
-- [ ] `zk-multisig`
 - [ ] New primitive: ___
 
 ## Circuit Compatibility

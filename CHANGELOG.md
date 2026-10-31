@@ -8,6 +8,10 @@ Releases are published automatically by `.github/workflows/release.yml` when the
 
 ## [Unreleased]
 
+### Removed
+
+- **Breaking:** the `zk-multisig` primitive and its `zk-smart-account-kit-sdk/zk-multisig` subpath export, along with its root re-exports (`generateMultiSigProof`, `buildMultiSigCircuitInput`, `encodeMultiSigInitData`, etc.), following its removal from zk-smart-account-kit.
+
 ### Changed
 
 - `LICENSE` and README now state Apache-2.0, matching `package.json` and the npm package (previously an MIT `LICENSE`).

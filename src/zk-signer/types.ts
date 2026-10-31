@@ -7,7 +7,6 @@
  *
  * Noir source:
  *   lib/zk_signer/src/lib.nr
- *   zk_multi_sig_ecdsa/src/main.nr
  */
 
 import type { Hex, Address } from "viem";

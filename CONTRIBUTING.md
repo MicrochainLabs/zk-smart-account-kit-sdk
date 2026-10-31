@@ -52,7 +52,6 @@ src/
   zk-label/       Private label registry
   zk-signer/      Single-signer ECDSA proofs
   zk-scope/       Scope policy tree and rules
-  zk-multisig/    M-of-N ECDSA multi-sig
   index.ts        Root re-exports
   ambient.d.ts    Type stubs for optional peer dependencies
 ```
