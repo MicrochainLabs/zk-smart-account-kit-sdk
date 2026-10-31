@@ -71,6 +71,16 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm build
 
+      # CycloneDX SBOM of what a consumer installs (the packed tarball + its production dependencies).
+      - name: Generate SBOM
+        if: steps.version.outputs.release == 'true'
+        run: |
+          work=$(mktemp -d)
+          npm pack --pack-destination "$work" >/dev/null
+          (cd "$work" && echo '{"name":"sbom","version":"1.0.0","private":true}' > package.json \
+            && npm install --no-audit --no-fund ./*.tgz >/dev/null \
+            && npm sbom --sbom-format cyclonedx --omit dev > "$GITHUB_WORKSPACE/sbom.cdx.json")
+
       - name: Publish to npm
         if: steps.version.outputs.publish == 'true'
         run: |
@@ -85,4 +95,4 @@ jobs:
         run: |
           args=(--target "$SHA" --title "${{ steps.version.outputs.tag }}" --generate-notes)
           if [ "${{ steps.version.outputs.prerelease }}" = "true" ]; then args+=(--prerelease); fi
-          gh release create "${{ steps.version.outputs.tag }}" "${args[@]}"
+          gh release create "${{ steps.version.outputs.tag }}" "${args[@]}" sbom.cdx.json

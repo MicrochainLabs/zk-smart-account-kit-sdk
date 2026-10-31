@@ -3,14 +3,10 @@
  * Browser-safe.
  */
 
-import {
-    encodeAbiParameters,
-    parseAbiParameters,
-    toHex,
-    type Hex,
-    type Address,
-} from "viem";
-import { addressToField, selectorToField, computeCalldataHash, padParamValues } from "./rule.js";
+import { encodeAbiParameters, parseAbiParameters, toHex, type Hex, type Address } from "viem";
+import { InvalidArgumentError } from "../errors.js";
+import { assertHex, assertHexBytes, toFieldElement } from "../internal/validation.js";
+import { addressToField, assertU128, selectorToField } from "./rule.js";
 import type { ScopeProofData } from "./types.js";
 
 /**
@@ -20,25 +16,23 @@ import type { ScopeProofData } from "./types.js";
  *   [0] txn_target, [1] txn_selector, [2] txn_value, [3] txn_calldata_hash, [4] scope_root
  */
 export function encodeScopePublicInputs(
-    txnTarget:       Address,
-    txnSelector:     Hex,
-    txnValue:        bigint,
+    txnTarget: Address,
+    txnSelector: Hex,
+    txnValue: bigint,
     txnCalldataHash: bigint | Hex,
-    scopeRoot:       bigint | Hex,
+    scopeRoot: bigint | Hex,
 ): Hex {
-    const calldataHash = typeof txnCalldataHash === "bigint" ? txnCalldataHash : BigInt(txnCalldataHash);
-    const root         = typeof scopeRoot       === "bigint" ? scopeRoot       : BigInt(scopeRoot);
+    const calldataHash = toFieldElement(txnCalldataHash, "txnCalldataHash");
+    const root = toFieldElement(scopeRoot, "scopeRoot");
+    assertU128(txnValue, "txnValue");
 
-    return encodeAbiParameters(
-        parseAbiParameters("bytes32, bytes32, bytes32, bytes32, bytes32"),
-        [
-            toHex(addressToField(txnTarget),        { size: 32 }),
-            toHex(selectorToField(txnSelector),     { size: 32 }),
-            toHex(txnValue,                          { size: 32 }),
-            toHex(calldataHash,                     { size: 32 }),
-            toHex(root,                             { size: 32 }),
-        ],
-    );
+    return encodeAbiParameters(parseAbiParameters("bytes32, bytes32, bytes32, bytes32, bytes32"), [
+        toHex(addressToField(txnTarget), { size: 32 }),
+        toHex(selectorToField(txnSelector), { size: 32 }),
+        toHex(txnValue, { size: 32 }),
+        toHex(calldataHash, { size: 32 }),
+        toHex(root, { size: 32 }),
+    ]);
 }
 
 /**
@@ -48,8 +42,21 @@ export function encodeScopePublicInputs(
 export function encodeScopeProofPublicInputs(proof: ScopeProofData): Hex {
     return encodeAbiParameters(
         parseAbiParameters("bytes32, bytes32, bytes32, bytes32, bytes32"),
-        proof.publicInputs.slice(0, 5) as [Hex, Hex, Hex, Hex, Hex],
+        publicInputsOf(proof),
     );
+}
+
+function publicInputsOf(proof: ScopeProofData): [Hex, Hex, Hex, Hex, Hex] {
+    if (!Array.isArray(proof?.publicInputs) || proof.publicInputs.length !== 5) {
+        throw new InvalidArgumentError("proofData.publicInputs must contain exactly 5 entries.");
+    }
+    return proof.publicInputs.map((v, i) => assertHexBytes(v, 32, `proofData.publicInputs[${i}]`)) as [
+        Hex,
+        Hex,
+        Hex,
+        Hex,
+        Hex,
+    ];
 }
 
 /**
@@ -58,11 +65,8 @@ export function encodeScopeProofPublicInputs(proof: ScopeProofData): Hex {
  * Layout: abi.encode(bytes32 scopeRoot)
  */
 export function encodeScopeInitData(scopeRoot: bigint | Hex): Hex {
-    const root = typeof scopeRoot === "bigint" ? scopeRoot : BigInt(scopeRoot);
-    return encodeAbiParameters(
-        parseAbiParameters("bytes32"),
-        [toHex(root, { size: 32 })],
-    );
+    const root = toFieldElement(scopeRoot, "scopeRoot");
+    return encodeAbiParameters(parseAbiParameters("bytes32"), [toHex(root, { size: 32 })]);
 }
 
 /**
@@ -71,11 +75,9 @@ export function encodeScopeInitData(scopeRoot: bigint | Hex): Hex {
  * Layout: abi.encode(bytes32 newScopeRoot, bytes proof)
  */
 export function encodeUpdateScopeRootData(newScopeRoot: bigint | Hex, proof: Hex): Hex {
-    const root = typeof newScopeRoot === "bigint" ? newScopeRoot : BigInt(newScopeRoot);
-    return encodeAbiParameters(
-        parseAbiParameters("bytes32, bytes"),
-        [toHex(root, { size: 32 }), proof],
-    );
+    const root = toFieldElement(newScopeRoot, "newScopeRoot");
+    assertHex(proof, "proof");
+    return encodeAbiParameters(parseAbiParameters("bytes32, bytes"), [toHex(root, { size: 32 }), proof]);
 }
 
 /**
@@ -84,12 +86,9 @@ export function encodeUpdateScopeRootData(newScopeRoot: bigint | Hex, proof: Hex
  * Layout: abi.encode(bytes proof, bytes publicInputs)
  */
 export function encodeScopeProofCalldata(proofData: ScopeProofData): Hex {
-    const encodedInputs = encodeAbiParameters(
-        parseAbiParameters("bytes32, bytes32, bytes32, bytes32, bytes32"),
-        proofData.publicInputs.slice(0, 5) as [Hex, Hex, Hex, Hex, Hex],
-    );
-    return encodeAbiParameters(
-        parseAbiParameters("bytes, bytes"),
-        [proofData.proof, encodedInputs],
-    );
+    const encodedInputs = encodeScopeProofPublicInputs(proofData);
+    return encodeAbiParameters(parseAbiParameters("bytes, bytes"), [
+        assertHex(proofData.proof, "proofData.proof"),
+        encodedInputs,
+    ]);
 }

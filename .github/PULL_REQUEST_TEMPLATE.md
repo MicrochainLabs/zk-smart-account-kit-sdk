@@ -18,7 +18,8 @@ Closes #
 
 - [ ] I have read [CONTRIBUTING.md](CONTRIBUTING.md)
 - [ ] My PR targets `develop` and my branch is up to date with it
-- [ ] `pnpm typecheck` and `pnpm build` pass
+- [ ] `pnpm verify` passes
+- [ ] New behaviour has unit tests; circuit-facing changes have an end-to-end test in `test/e2e`
 - [ ] Public API changes are reflected in the README
 - [ ] `CHANGELOG.md` is updated under `[Unreleased]`
 - [ ] Circuit-facing changes stay compatible with the circuits in zk-smart-account-kit / microchain-zk-signers

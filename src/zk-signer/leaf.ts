@@ -6,8 +6,9 @@
  * circuit will reject.
  */
 
-import { poseidon } from "@iden3/js-crypto";
+import { poseidon } from "../internal/poseidon.js";
 import type { Address } from "viem";
+import { assertAddress } from "../internal/validation.js";
 
 // ─── Field conversion ─────────────────────────────────────────────────────────
 
@@ -17,6 +18,7 @@ import type { Address } from "viem";
  * Safe because 2^160 < BN254 field modulus.
  */
 export function signerToField(signer: Address): bigint {
+    assertAddress(signer, "signer");
     return BigInt(signer.toLowerCase());
 }
 

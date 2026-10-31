@@ -1,7 +1,7 @@
 {
   "name": "zk-smart-account-kit-sdk",
   "version": "0.1.5",
-  "description": "TypeScript SDK for ZK primitives for smart accounts— ZK Label, ZK Signer, ZK Scope",
+  "description": "TypeScript SDK for ZK primitives for smart accounts\u2014 ZK Label, ZK Signer, ZK Scope",
   "keywords": [
     "zk",
     "zero-knowledge",
@@ -22,36 +22,91 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
     },
     "./zk-label": {
-      "import": "./dist/zk-label/index.js",
-      "types": "./dist/zk-label/index.d.ts"
+      "import": {
+        "types": "./dist/esm/zk-label/index.d.ts",
+        "default": "./dist/esm/zk-label/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/zk-label/index.d.ts",
+        "default": "./dist/cjs/zk-label/index.js"
+      }
     },
     "./zk-signer": {
-      "import": "./dist/zk-signer/index.js",
-      "types": "./dist/zk-signer/index.d.ts"
+      "import": {
+        "types": "./dist/esm/zk-signer/index.d.ts",
+        "default": "./dist/esm/zk-signer/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/zk-signer/index.d.ts",
+        "default": "./dist/cjs/zk-signer/index.js"
+      }
     },
     "./zk-scope": {
-      "import": "./dist/zk-scope/index.js",
-      "types": "./dist/zk-scope/index.d.ts"
-    }
+      "import": {
+        "types": "./dist/esm/zk-scope/index.d.ts",
+        "default": "./dist/esm/zk-scope/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/zk-scope/index.d.ts",
+        "default": "./dist/cjs/zk-scope/index.js"
+      }
+    },
+    "./errors": {
+      "import": {
+        "types": "./dist/esm/errors.d.ts",
+        "default": "./dist/esm/errors.js"
+      },
+      "require": {
+        "types": "./dist/cjs/errors.d.ts",
+        "default": "./dist/cjs/errors.js"
+      }
+    },
+    "./package.json": "./package.json"
   },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "NOTICE"
   ],
+  "sideEffects": false,
   "scripts": {
-    "build": "tsc --project tsconfig.json",
-    "prepublishOnly": "pnpm clean && pnpm build",
+    "build": "node scripts/build.mjs",
+    "clean": "rm -rf dist coverage docs/api",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:unit": "vitest run --exclude test/e2e/**",
+    "test:e2e": "vitest run test/e2e",
+    "test:coverage": "vitest run --coverage",
+    "sync-circuits": "node scripts/sync-circuits.mjs",
+    "docs:api": "typedoc",
+    "lint:package": "publint --strict && attw --pack . --profile node16",
+    "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:coverage && pnpm build && pnpm lint:package && pnpm docs:api && pnpm smoke",
+    "prepublishOnly": "pnpm clean && pnpm build",
+    "prepare": "husky || true",
+    "smoke": "node scripts/smoke.mjs",
+    "audit:deps": "pnpm audit --prod --audit-level moderate"
   },
   "dependencies": {
     "@iden3/js-crypto": "^1.0.3",
-    "@zk-kit/lean-imt": "^2.1.0",
+    "@noble/curves": "^1.9.1",
     "viem": "^2.21.0"
   },
   "peerDependencies": {
@@ -67,11 +122,36 @@
     }
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@aztec/bb.js": "5.0.0-nightly.20260522",
+    "@eslint/js": "^10.0.1",
+    "@noir-lang/noir_js": "1.0.0-beta.22",
     "@types/node": "^22.0.0",
-    "typescript": "^5.5.3"
+    "@vitest/coverage-v8": "^5.0.5",
+    "@zk-kit/lean-imt": "2.2.4",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.14.0",
+    "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
+    "prettier": "^3.9.10",
+    "publint": "^0.3.25",
+    "typedoc": "^0.28.20",
+    "typescript": "^5.5.3",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.0.5"
   },
   "engines": {
     "node": ">=18"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "lint-staged": {
+    "*.{ts,mjs,js,json,yml}": "prettier --write",
+    "*.ts": "eslint --fix"
+  },
+  "pnpm": {
+    "overrides": {
+      "ws": ">=8.21.0"
+    }
+  }
 }

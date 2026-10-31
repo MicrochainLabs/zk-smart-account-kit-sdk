@@ -12,15 +12,21 @@ TypeScript SDK for integrating smart account ZK primitives built with Noir — *
 pnpm add zk-smart-account-kit-sdk
 ```
 
+The package ships ESM and CommonJS builds with types for both. Node.js 18+ is supported (proof generation is verified on Node 20+ — see [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)).
+
 ### Optional peer dependencies (Node.js proof generation)
 
 ```bash
-pnpm add @aztec/bb.js @noir-lang/noir_js
+pnpm add @aztec/bb.js@5.0.0-nightly.20260522 @noir-lang/noir_js@1.0.0-beta.22
 ```
 
-These are only required when calling proof generation functions (`generateLabelBindingProof`, `generateZKSignerProof`, `generateScopeProof`). All tree builders, circuit input builders, and ABI helpers are browser-safe and work without peer deps.
+These are only required when calling proof generation functions (`generateLabelBindingProof`, `generateZKSignerProof`, `generateScopeProof`, or `proveLabelMembership` on `createZKLabels`). All tree builders, circuit input builders, and ABI helpers are browser-safe and work without peer deps. If a peer is missing, proving throws a `MissingPeerDependencyError` that tells you what to install.
 
-The compiled circuit JSON files used in the examples below (for example `zk_label_binding.json`) are not bundled with this package: compile them with `nargo` from [zk-smart-account-kit](https://github.com/MicrochainLabs/zk-smart-account-kit), using Nargo `1.0.0-beta.22`.
+### Circuits
+
+The compiled circuit JSON files used in the examples below (for example `zk_label_binding.json`) are not bundled with this package: compile them with `nargo` from [zk-smart-account-kit](https://github.com/MicrochainLabs/zk-smart-account-kit), using Nargo `1.0.0-beta.22`. Every prover checks that the artifact you pass is the circuit it expects and throws `InvalidCircuitError` otherwise.
+
+Runnable, tested examples: [zk-signer](examples/zk-signer.ts), [zk-label](examples/zk-label.ts), [zk-scope](examples/zk-scope.ts).
 
 ---
 
@@ -48,7 +54,7 @@ root = LeanIMT root over all leaves
 ### High-level API (`createZKLabels`)
 
 ```ts
-import circuit from "./noir/zk_label_binding/target/zk_label_binding.json" assert { type: "json" };
+import circuit from "./noir/zk_label_binding/target/zk_label_binding.json" with { type: "json" };
 import { createZKLabels, type LabelEntry, type ZKLabels } from "zk-smart-account-kit-sdk/zk-label";
 
 const labels: LabelEntry[] = [
@@ -119,7 +125,7 @@ signersRoot  = LeanIMT root over all signer leaves
 ### API
 
 ```ts
-import circuit from "./target/zk_signers.json" assert { type: "json" };
+import circuit from "./target/zk_signers.json" with { type: "json" };
 import {
   buildSignersTree,
   generateZKSignerProof,
@@ -171,7 +177,7 @@ scopeRoot   = LeanIMT root over all rule leaves
 ### API
 
 ```ts
-import circuit from "./target/zk_scope_validation.json" assert { type: "json" };
+import circuit from "./target/zk_scope_validation.json" with { type: "json" };
 import {
   buildScopeTree,
   generateScopeProof,
@@ -219,11 +225,73 @@ const calldata = encodeScopeProofCalldata(proofData);
 
 ---
 
+## Validation and errors
+
+Every public function validates its input at runtime and fails early with a typed error. All errors extend `ZKSdkError` and carry a stable `code`:
+
+| Class | `code` | Typical cause |
+|---|---|---|
+| `InvalidArgumentError` | `INVALID_ARGUMENT` | Bad address / checksum, wrong byte length, value outside the BN254 field, a selector that is not exactly 4 bytes, more than 4 params or constraints, empty registry, signature not valid for the signer |
+| `NotFoundError` | `NOT_FOUND` | Signer / label / rule not in the tree |
+| `TreeCapacityError` | `TREE_CAPACITY_EXCEEDED` | More than 16 signers or labels, or 64 scope rules — the circuit could never prove such a root |
+| `InvalidCircuitError` | `INVALID_CIRCUIT` | Wrong or malformed circuit artifact |
+| `MissingPeerDependencyError` | `MISSING_PEER_DEPENDENCY` | `@aztec/bb.js` / `@noir-lang/noir_js` not installed |
+| `ProofGenerationError` | `PROOF_GENERATION_FAILED` | Witness constraint not satisfied, or proving failed (`error.cause` has the original) |
+
+```ts
+import { ZKSdkError } from "zk-smart-account-kit-sdk/errors";
+
+try {
+  await generateZKSignerProof(/* … */);
+} catch (error) {
+  if (error instanceof ZKSdkError && error.code === "NOT_FOUND") { /* signer was removed */ }
+  else throw error;
+}
+```
+
+Before proving, the SDK runs cheap off-circuit checks (the public key derives to the signer, the signature is a valid low-S ECDSA signature of the hash, the transaction satisfies the scope rule) so mistakes fail in milliseconds with a precise message. These checks are a convenience, not a security control: the circuit is the authority.
+
+### Reusing Barretenberg across proofs
+
+Creating a Barretenberg instance is expensive. By default each proof creates and destroys its own; long-running services should share one:
+
+```ts
+import { Barretenberg } from "@aztec/bb.js";
+
+const barretenberg = await Barretenberg.new();
+const proof = await generateZKSignerProof(pubKey, sig, signer, tree, hash, circuit, { barretenberg });
+// …
+await barretenberg.destroy(); // you own the instance you pass in
+```
+
+---
+
+## Documentation
+
+- API reference: `pnpm docs:api` (generated into `docs/api`).
+- [Threat model](docs/THREAT-MODEL.md) · [Compatibility](docs/COMPATIBILITY.md) · [Versioning & deprecation](docs/VERSIONING.md) · [Security policy](SECURITY.md)
+
+---
+
+## Development
+
+```bash
+pnpm install
+pnpm verify        # typecheck, lint, format check, tests + coverage, build, package lint, docs, install smoke test
+pnpm test          # unit + end-to-end proof tests (real circuits, ~30 s)
+pnpm test:unit     # fast unit tests only
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
 ## Adding a new primitive
 
 1. Create `src/<primitive-name>/types.ts`, `src/<primitive-name>/index.ts`, and any implementation files.
 2. Re-export from `src/index.ts`.
-3. Add a `"./primitive-name"` entry to `exports` in `package.json`.
+3. Add a `"./primitive-name"` entry (with `import` and `require` conditions, as for the existing ones) to `exports` in `package.json`.
+4. Add unit tests, an end-to-end proof test against the compiled circuit, and an example.
 
 ---
 

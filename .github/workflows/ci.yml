@@ -14,14 +14,49 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Typecheck & build (Node ${{ matrix.node }})
+  quality:
+    name: Typecheck, lint, audit, docs
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Dependency audit (production dependencies)
+        run: pnpm audit:deps
+
+      - name: API docs build (fails on broken doc comments)
+        run: pnpm docs:api
+
+  test:
+    name: Tests + coverage (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        node: [18, 20, 22]
+        # Test tooling (vitest, eslint) needs Node 20+. Node 18 is covered by the package smoke test.
+        node: [20, 22, 24]
     steps:
       - uses: actions/checkout@v4
 
@@ -37,11 +72,97 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
-        run: pnpm typecheck
+      # Unit tests and end-to-end proof tests (real Noir circuits + Barretenberg), with coverage thresholds.
+      - name: Test
+        run: pnpm test:coverage
 
-      - name: Build
+      - name: Upload coverage
+        if: matrix.node == 22
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 14
+
+  build:
+    name: Build & package checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (ESM + CJS)
         run: pnpm build
 
-      - name: Check package contents
-        run: npm pack --dry-run
+      - name: Package lint (publint + are-the-types-wrong)
+        run: pnpm lint:package
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7
+
+  smoke:
+    name: Install & import smoke test (Node ${{ matrix.node }})
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22, 24]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      # Installs the packed tarball into an empty project, as a consumer would, and loads it from ESM and CJS.
+      - name: Smoke test
+        run: node scripts/smoke.mjs
+
+  compat-bb-latest:
+    name: Compatibility — latest stable @aztec/bb.js (informational)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install latest stable @aztec/bb.js
+        run: pnpm add -D @aztec/bb.js@latest
+
+      - name: End-to-end proof tests
+        run: pnpm test:e2e
