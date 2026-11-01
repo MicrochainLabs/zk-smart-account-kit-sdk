@@ -61,11 +61,13 @@ const MODE_SINGLE_REVERT: Hex = `0x${"00".repeat(32)}`;
 
 /**
  * Gas defaults for a UserOperation validated by the ZK validator. On-chain UltraHonk verification is
- * expensive; the verification limit is deliberately generous.
+ * expensive; the limits are deliberately generous. `updateStateRoot` verifies a proof inside the call and
+ * needs about 3.7M gas on current EVM versions. Keep `verificationGasLimit + callGasLimit +
+ * preVerificationGas` under the 16.7M per-transaction cap of Osaka (EIP-7825).
  */
 export const DEFAULT_GAS = {
     verificationGasLimit: 10_000_000n,
-    callGasLimit: 3_000_000n,
+    callGasLimit: 5_000_000n,
     preVerificationGas: 300_000n,
 } as const;
 

@@ -56,8 +56,9 @@ The end-to-end and on-chain tests use stripped copies of the compiled circuits a
 ```bash
 # after recompiling circuits / contracts
 pnpm sync-circuits ../zk-smart-account-kit/noir/target ../microchain-zk-signers/noir/target
-(cd ../microchain-zk-signers && forge build --out /tmp/zk-out --cache-path /tmp/zk-cache)
-pnpm sync-contracts /tmp/zk-out
+OUT="$(mktemp -d)"   # private directory, not a predictable shared path
+(cd ../microchain-zk-signers && forge build --out "$OUT/out" --cache-path "$OUT/cache")
+pnpm sync-contracts "$OUT/out"
 pnpm test
 ```
 

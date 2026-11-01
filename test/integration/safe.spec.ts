@@ -1,9 +1,10 @@
 /**
  * Integration with real Safe v1.4.1 contracts. Safe's bytecode is not vendored in this repository, so
- * these tests run against a Foundry build of microchain-zk-signers (which compiles Safe):
+ * these tests run against contracts built from source (Safe among them):
  *
- *   (cd ../microchain-zk-signers && forge build --out /tmp/zk-out --cache-path /tmp/zk-cache)
- *   ZK_SIGNERS_OUT=/tmp/zk-out pnpm test:integration
+ *   OUT="$(mktemp -d)"
+ *   node scripts/build-integration-contracts.mjs ../microchain-zk-signers "$OUT"
+ *   ZK_SIGNERS_OUT="$OUT" pnpm test:integration
  *
  * Skipped when `ZK_SIGNERS_OUT` is unset or Foundry's `anvil` is missing.
  */

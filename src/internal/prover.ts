@@ -57,15 +57,21 @@ export interface RawProof {
  * Creates a Barretenberg instance that is connected and ready, to share across proofs
  * (see {@link ProveOptions.barretenberg}); destroy it with `await instance.destroy()`.
  *
- * Prefer this over `Barretenberg.new()` from `@aztec/bb.js`: the native backend connects to its
- * prover process in the background and gives up after five seconds if the event loop is blocked
- * meanwhile — which witness generation does for the larger circuits — leaving a dead instance.
- * This function completes the connection before returning.
+ * Prefer this over `Barretenberg.new()` from `@aztec/bb.js`, for two reasons:
+ *
+ * - The native backend connects to its prover process in the background and gives up after five
+ *   seconds if the event loop is blocked meanwhile — which witness generation does for the larger
+ *   circuits — leaving a dead instance. This function completes the connection before returning.
+ * - It loads `@noir-lang/noir_js` first. On some Node.js releases (observed on 20.19 and 22.15, not on
+ *   24) importing `@noir-lang/noir_js` *after* the first round-trip with Barretenberg loads its WASM
+ *   dependencies from the wrong `node_modules` — another copy found further up the directory tree —
+ *   and witness generation then fails with `abiEncode is not a function`. Loading it up front avoids this.
  *
  * @param options.threads Number of prover threads (default: one per CPU core, up to 16).
- * @throws {MissingPeerDependencyError} if `@aztec/bb.js` is not installed.
+ * @throws {MissingPeerDependencyError} if `@aztec/bb.js` or `@noir-lang/noir_js` is not installed.
  */
 export async function createBarretenberg(options: { threads?: number } = {}): Promise<BarretenbergLike> {
+    await loadPeer("@noir-lang/noir_js", () => import("@noir-lang/noir_js"));
     const bb = await loadPeer("@aztec/bb.js", () => import("@aztec/bb.js"));
     const api = await bb.Barretenberg.new(options);
     try {

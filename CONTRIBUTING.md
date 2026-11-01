@@ -93,8 +93,9 @@ Each primitive follows the same layout: `types.ts`, `tree.ts`, `circuit.ts`, `ab
 Four layers, each catching what the previous cannot: **unit** (fast, in-memory chain for the viem helpers), **e2e** (real circuits: witness, EVM proof, verification), **on-chain** (the SDK's proofs verified by the real Microchain contracts on Anvil — fixtures in `test/fixtures/contracts`) and **integration** (real Safe v1.4.1, Nexus and EntryPoint v0.7, built from source because third-party bytecode is not vendored):
 
 ```bash
-node scripts/build-integration-contracts.mjs ../microchain-zk-signers /tmp/zk-int-out   # needs forge, git, network (first run)
-ZK_SIGNERS_OUT=/tmp/zk-int-out pnpm test:integration
+OUT="$(mktemp -d)"   # private directory: the tests deploy the bytecode built here, so do not use a shared, predictable path
+node scripts/build-integration-contracts.mjs ../microchain-zk-signers "$OUT"   # needs forge, git, network
+ZK_SIGNERS_OUT="$OUT" pnpm test:integration
 ```
 
 - Every change needs tests. Coverage thresholds are enforced in `vitest.config.ts` and must not be lowered.

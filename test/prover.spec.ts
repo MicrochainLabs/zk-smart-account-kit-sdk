@@ -149,6 +149,36 @@ describe("createBarretenberg", () => {
         expect(instance.destroy).not.toHaveBeenCalled();
     });
 
+    it("loads noir_js before the first Barretenberg round-trip (a Node.js module-resolution quirk otherwise loads the wrong WASM)", async () => {
+        const order: string[] = [];
+        vi.resetModules();
+        const destroy = vi.fn();
+        vi.doMock("@noir-lang/noir_js", () => {
+            order.push("noir_js");
+            return { Noir: class {} };
+        });
+        vi.doMock("@aztec/bb.js", () => {
+            order.push("bb.js");
+            return {
+                Barretenberg: {
+                    new: () => {
+                        order.push("Barretenberg.new");
+                        return Promise.resolve({
+                            destroy,
+                            grumpkinGetRandomFr: () => {
+                                order.push("round-trip");
+                                return Promise.resolve({});
+                            },
+                        });
+                    },
+                },
+            };
+        });
+        const { createBarretenberg } = await import("../src/internal/prover.js");
+        await createBarretenberg();
+        expect(order).toEqual(["noir_js", "bb.js", "Barretenberg.new", "round-trip"]);
+    });
+
     it("destroys the instance and rethrows when the connection never completes", async () => {
         const failure = new Error("Timeout connecting to bb socket");
         const instance = {

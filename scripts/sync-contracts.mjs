@@ -1,8 +1,9 @@
 // Exports ABI + creation bytecode of the Microchain contracts used by the on-chain tests into
 // test/fixtures/contracts, from a Foundry build of microchain-zk-signers:
 //
-//   (cd ../microchain-zk-signers && forge build --out /tmp/zk-out --cache-path /tmp/zk-cache)
-//   pnpm sync-contracts /tmp/zk-out
+//   OUT="$(mktemp -d)"   # private directory, not a predictable shared path
+//   (cd ../microchain-zk-signers && forge build --out "$OUT/out" --cache-path "$OUT/cache")
+//   pnpm sync-contracts "$OUT/out"
 //
 // Only Microchain's own contracts and the verifiers generated from the circuits are exported (no
 // third-party bytecode). A manifest records the compiler version and a SHA-256 of every fixture so

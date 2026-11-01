@@ -369,7 +369,7 @@ const proof = await generateZKSignerProof(pubKey, sig, signer, tree, hash, circu
 await barretenberg.destroy(); // you own the instance you pass in
 ```
 
-Use `createBarretenberg()` rather than `Barretenberg.new()` from `@aztec/bb.js`: the native backend connects to its prover process lazily and gives up after five seconds if the event loop is blocked meanwhile — which witness generation does for the larger circuits — leaving a dead instance. `createBarretenberg()` completes the connection before returning.
+Use `createBarretenberg()` rather than `Barretenberg.new()` from `@aztec/bb.js`: the native backend connects to its prover process lazily and gives up after five seconds if the event loop is blocked meanwhile — which witness generation does for the larger circuits — leaving a dead instance. `createBarretenberg()` completes the connection before returning, and loads `@noir-lang/noir_js` first (on some Node.js releases — seen on 20.19 and 22.15 — importing it after the first Barretenberg call picks up the wrong WASM dependencies and fails with `abiEncode is not a function`).
 
 ---
 

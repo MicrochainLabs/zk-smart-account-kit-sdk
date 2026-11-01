@@ -4,8 +4,9 @@
  *
  * Third-party bytecode is not vendored here, so these tests run against contracts built from source:
  *
- *   node scripts/build-integration-contracts.mjs ../microchain-zk-signers /tmp/zk-int-out
- *   ZK_SIGNERS_OUT=/tmp/zk-int-out pnpm test:integration
+ *   OUT="$(mktemp -d)"
+ *   node scripts/build-integration-contracts.mjs ../microchain-zk-signers "$OUT"
+ *   ZK_SIGNERS_OUT="$OUT" pnpm test:integration
  *
  * Skipped when `ZK_SIGNERS_OUT` is unset or Foundry's `anvil` is missing.
  */
