@@ -144,7 +144,7 @@
   },
   "dependencies": {
     "@iden3/js-crypto": "^1.0.3",
-    "@noble/curves": "^1.9.1",
+    "@noble/curves": "^2.4.0",
     "viem": "^2.21.0"
   },
   "peerDependencies": {
