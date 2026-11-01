@@ -6,6 +6,7 @@ interface Mocks {
     destroy: ReturnType<typeof vi.fn>;
     execute: ReturnType<typeof vi.fn>;
     generateProof: ReturnType<typeof vi.fn>;
+    verifyProof: ReturnType<typeof vi.fn>;
     newBarretenberg: ReturnType<typeof vi.fn>;
 }
 
@@ -14,9 +15,10 @@ async function loadProver(overrides: Partial<Mocks> = {}) {
     const destroy = vi.fn().mockResolvedValue(undefined);
     const mocks: Mocks = {
         destroy,
-        newBarretenberg: vi.fn().mockResolvedValue({ destroy }),
+        newBarretenberg: vi.fn().mockResolvedValue({ destroy, grumpkinGetRandomFr: vi.fn().mockResolvedValue({}) }),
         execute: vi.fn().mockResolvedValue({ witness: new Uint8Array([1]) }),
         generateProof: vi.fn().mockResolvedValue({ proof: new Uint8Array([0xde, 0xad]), publicInputs: ["0x1", "0x2"] }),
+        verifyProof: vi.fn().mockResolvedValue(true),
         ...overrides,
     };
 
@@ -24,6 +26,7 @@ async function loadProver(overrides: Partial<Mocks> = {}) {
         Barretenberg: { new: mocks.newBarretenberg },
         UltraHonkBackend: class {
             generateProof = mocks.generateProof;
+            verifyProof = mocks.verifyProof;
         },
     }));
     vi.doMock("@noir-lang/noir_js", () => ({
@@ -33,9 +36,9 @@ async function loadProver(overrides: Partial<Mocks> = {}) {
     }));
 
     // Imported after the module reset so `instanceof` checks see the same error classes the prover threw.
-    const { proveCircuit } = await import("../src/internal/prover.js");
+    const { proveCircuit, createBarretenberg } = await import("../src/internal/prover.js");
     const errors = await import("../src/errors.js");
-    return { proveCircuit, mocks, errors };
+    return { proveCircuit, createBarretenberg, mocks, errors };
 }
 
 afterEach(() => {
@@ -54,6 +57,51 @@ describe("proveCircuit", () => {
         expect(mocks.destroy).toHaveBeenCalledTimes(1);
     });
 
+    it("generates and verifies EVM-target proofs by default", async () => {
+        const { proveCircuit, mocks } = await loadProver();
+        await proveCircuit(circuit as never, {}, 2);
+        expect(mocks.generateProof).toHaveBeenCalledWith(expect.anything(), { verifierTarget: "evm" });
+        expect(mocks.verifyProof).toHaveBeenCalledWith(expect.anything(), { verifierTarget: "evm" });
+    });
+
+    it("honours a custom verifierTarget and can skip local verification", async () => {
+        const { proveCircuit, mocks } = await loadProver();
+        await proveCircuit(circuit as never, {}, 2, { verifierTarget: "evm-no-zk", verify: false });
+        expect(mocks.generateProof).toHaveBeenCalledWith(expect.anything(), { verifierTarget: "evm-no-zk" });
+        expect(mocks.verifyProof).not.toHaveBeenCalled();
+    });
+
+    it("rejects a proof that fails local verification", async () => {
+        const { proveCircuit, errors } = await loadProver({ verifyProof: vi.fn().mockResolvedValue(false) });
+        const error = await proveCircuit(circuit as never, {}, 2).catch((e) => e);
+        expect(error).toBeInstanceOf(errors.ProofGenerationError);
+        expect(error.message).toContain("does not verify");
+    });
+
+    it("generates the witness before it creates Barretenberg (which would otherwise lose its connection)", async () => {
+        const order: string[] = [];
+        const { proveCircuit } = await loadProver({
+            execute: vi.fn().mockImplementation(() => {
+                order.push("witness");
+                return Promise.resolve({ witness: new Uint8Array([1]) });
+            }),
+            newBarretenberg: vi.fn().mockImplementation(() => {
+                order.push("barretenberg");
+                return Promise.resolve({ destroy: vi.fn(), grumpkinGetRandomFr: vi.fn().mockResolvedValue({}) });
+            }),
+        });
+        await proveCircuit(circuit as never, {}, 2);
+        expect(order).toEqual(["witness", "barretenberg"]);
+    });
+
+    it("does not create Barretenberg at all when the witness cannot be generated", async () => {
+        const { proveCircuit, mocks } = await loadProver({
+            execute: vi.fn().mockRejectedValue(new Error("unsatisfied")),
+        });
+        await expect(proveCircuit(circuit as never, {}, 2)).rejects.toThrow(/Witness generation failed/);
+        expect(mocks.newBarretenberg).not.toHaveBeenCalled();
+    });
+
     it("never destroys a caller-supplied Barretenberg instance", async () => {
         const { proveCircuit, mocks } = await loadProver();
         const shared = { destroy: vi.fn() };
@@ -62,7 +110,7 @@ describe("proveCircuit", () => {
         expect(mocks.newBarretenberg).not.toHaveBeenCalled();
     });
 
-    it("wraps witness failures and still releases resources", async () => {
+    it("wraps witness failures without ever starting the prover", async () => {
         const cause = new Error("Cannot satisfy constraint");
         const { proveCircuit, mocks, errors } = await loadProver({ execute: vi.fn().mockRejectedValue(cause) });
         const error = await proveCircuit(circuit as never, {}, 2).catch((e) => e);
@@ -71,7 +119,7 @@ describe("proveCircuit", () => {
         expect(error.message).toContain("Cannot satisfy constraint");
         expect(error.cause).toBe(cause);
         expect(mocks.generateProof).not.toHaveBeenCalled();
-        expect(mocks.destroy).toHaveBeenCalledTimes(1);
+        expect(mocks.newBarretenberg).not.toHaveBeenCalled();
     });
 
     it("wraps proving failures (including non-Error throwables) and still releases resources", async () => {
@@ -85,6 +133,38 @@ describe("proveCircuit", () => {
     it("rejects an unexpected number of public inputs", async () => {
         const { proveCircuit } = await loadProver();
         await expect(proveCircuit(circuit as never, {}, 33)).rejects.toThrow(/2 public inputs; expected 33/);
+    });
+});
+
+describe("createBarretenberg", () => {
+    it("creates an instance and completes its lazy connection with a round-trip", async () => {
+        const grumpkinGetRandomFr = vi.fn().mockResolvedValue({});
+        const instance = { destroy: vi.fn(), grumpkinGetRandomFr };
+        const { createBarretenberg, mocks } = await loadProver({
+            newBarretenberg: vi.fn().mockResolvedValue(instance),
+        });
+        await expect(createBarretenberg({ threads: 2 })).resolves.toBe(instance);
+        expect(mocks.newBarretenberg).toHaveBeenCalledWith({ threads: 2 });
+        expect(grumpkinGetRandomFr).toHaveBeenCalledTimes(1);
+        expect(instance.destroy).not.toHaveBeenCalled();
+    });
+
+    it("destroys the instance and rethrows when the connection never completes", async () => {
+        const failure = new Error("Timeout connecting to bb socket");
+        const instance = {
+            destroy: vi.fn().mockResolvedValue(undefined),
+            grumpkinGetRandomFr: vi.fn().mockRejectedValue(failure),
+        };
+        const { createBarretenberg } = await loadProver({ newBarretenberg: vi.fn().mockResolvedValue(instance) });
+        await expect(createBarretenberg()).rejects.toBe(failure);
+        expect(instance.destroy).toHaveBeenCalledTimes(1);
+
+        const stubborn = {
+            destroy: vi.fn().mockRejectedValue(new Error("destroy failed")),
+            grumpkinGetRandomFr: vi.fn().mockRejectedValue(failure),
+        };
+        const again = await loadProver({ newBarretenberg: vi.fn().mockResolvedValue(stubborn) });
+        await expect(again.createBarretenberg()).rejects.toBe(failure);
     });
 });
 

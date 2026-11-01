@@ -4,9 +4,10 @@ The SDK follows [Semantic Versioning](https://semver.org/).
 
 ## What counts as the public API
 
-- Everything exported from `zk-smart-account-kit-sdk`, `/zk-signer`, `/zk-label`, `/zk-scope` and `/errors`, with the behaviour documented in the generated API docs (`pnpm docs:api`).
-- The `code` of every `ZKSdkError` (`INVALID_ARGUMENT`, `NOT_FOUND`, `TREE_CAPACITY_EXCEEDED`, `INVALID_CIRCUIT`, `MISSING_PEER_DEPENDENCY`, `PROOF_GENERATION_FAILED`). Error **messages** are not API.
-- The byte-level outputs that must match the circuits and contracts: leaf and root values, circuit input field names, ABI layouts.
+- Everything exported from `zk-smart-account-kit-sdk`, `/zk-signer`, `/zk-label`, `/zk-scope`, `/zk-multisig`, `/zk-multisig/safe`, `/zk-multisig/nexus` and `/errors`, with the behaviour documented in the generated API docs (`pnpm docs:api`).
+- The `code` of every `ZKSdkError` (`INVALID_ARGUMENT`, `NOT_FOUND`, `TREE_CAPACITY_EXCEEDED`, `INVALID_CIRCUIT`, `MISSING_PEER_DEPENDENCY`, `PROOF_GENERATION_FAILED`, `CHAIN_STATE_MISMATCH`, `UNSUPPORTED_ENVIRONMENT`). Error **messages** are not API.
+- The byte-level outputs that must match the circuits and contracts: leaf and root values, circuit input field names, ABI layouts, the state-root construction, and the Safe signature and Nexus nonce layouts.
+- The `abi` constants exported by `/zk-multisig/safe` and `/zk-multisig/nexus` follow the deployed contracts; they change only when the contracts do.
 
 Not public: anything under `src/internal`, and any module path not listed in `package.json` `exports`.
 

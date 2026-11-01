@@ -8,6 +8,7 @@
  * Circuit artifacts live in test/fixtures/circuits (refresh with `pnpm sync-circuits`).
  */
 
+import { createBarretenberg } from "../../src/internal/prover.js";
 import { Barretenberg, UltraHonkBackend } from "@aztec/bb.js";
 import { Noir } from "@noir-lang/noir_js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -56,7 +57,7 @@ const scopeCircuit = loadCircuit("zk_scope_validation");
 // One Barretenberg instance for the whole file, exercising the `options.barretenberg` reuse path.
 let api: Barretenberg;
 beforeAll(async () => {
-    api = await Barretenberg.new();
+    api = (await createBarretenberg()) as Barretenberg;
 }, 120_000);
 afterAll(async () => {
     await api.destroy();
@@ -71,7 +72,8 @@ async function execute(circuit: unknown, input: unknown) {
 async function verify(circuit: { bytecode: string }, proof: { proof: string; publicInputs: string[] }) {
     const backend = new UltraHonkBackend(circuit.bytecode, api);
     const bytes = Uint8Array.from(Buffer.from(proof.proof.slice(2), "hex"));
-    return backend.verifyProof({ proof: bytes, publicInputs: proof.publicInputs });
+    // The default (and on-chain) flavour: keccak transcript, zero-knowledge.
+    return backend.verifyProof({ proof: bytes, publicInputs: proof.publicInputs }, { verifierTarget: "evm" });
 }
 
 describe("circuit fixtures", () => {

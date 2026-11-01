@@ -46,7 +46,8 @@ export {
 } from "./abi.js";
 
 // Proof generation (Node.js, requires peer deps)
-export type { ProveOptions, BarretenbergLike } from "../internal/prover.js";
+export { createBarretenberg } from "../internal/prover.js";
+export type { ProveOptions, BarretenbergLike, VerifierTarget } from "../internal/prover.js";
 export { generateLabelBindingProof } from "./prove.js";
 
 // High-level factory (viem-style)

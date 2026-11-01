@@ -13,7 +13,9 @@ export type ZKSdkErrorCode =
     | "TREE_CAPACITY_EXCEEDED"
     | "INVALID_CIRCUIT"
     | "MISSING_PEER_DEPENDENCY"
-    | "PROOF_GENERATION_FAILED";
+    | "PROOF_GENERATION_FAILED"
+    | "UNSUPPORTED_ENVIRONMENT"
+    | "CHAIN_STATE_MISMATCH";
 
 /** Base class of every error thrown by this SDK. */
 export class ZKSdkError extends Error {
@@ -70,5 +72,19 @@ export class MissingPeerDependencyError extends ZKSdkError {
 export class ProofGenerationError extends ZKSdkError {
     constructor(message: string, cause?: unknown) {
         super("PROOF_GENERATION_FAILED", message, { cause });
+    }
+}
+
+/** The runtime lacks a required capability (for example a secure random source). */
+export class UnsupportedEnvironmentError extends ZKSdkError {
+    constructor(message: string) {
+        super("UNSUPPORTED_ENVIRONMENT", message);
+    }
+}
+
+/** On-chain state does not match what the caller expects (wrong state root, validator not installed, …). */
+export class ChainStateError extends ZKSdkError {
+    constructor(message: string, cause?: unknown) {
+        super("CHAIN_STATE_MISMATCH", message, { cause });
     }
 }

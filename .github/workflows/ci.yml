@@ -71,7 +71,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Unit tests and end-to-end proof tests (real Noir circuits + Barretenberg), with coverage thresholds.
+      # Anvil for the on-chain tests, which verify SDK proofs with the real Microchain contracts.
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      # Unit tests, end-to-end proof tests (real Noir circuits + Barretenberg) and on-chain tests
+      # (Anvil + generated Honk verifiers, ZK signer factory, Nexus validator), with coverage thresholds.
       - name: Test
         run: pnpm test:coverage
 
@@ -139,6 +143,48 @@ jobs:
       # Installs the packed tarball into an empty project, as a consumer would, and loads it from ESM and CJS.
       - name: Smoke test
         run: node scripts/smoke.mjs
+
+  integration:
+    name: Integration — real Safe, Nexus and EntryPoint v0.7
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Builds third-party contracts from source (microchain-zk-signers, Nexus and their dependencies), so it
+    # depends on those repositories and the network. Informational until its inputs are pinned by a release.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: MicrochainLabs/microchain-zk-signers
+          path: microchain-zk-signers
+          submodules: recursive
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install SDK dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install microchain-zk-signers dependencies (Solidity sources)
+        run: pnpm install --frozen-lockfile
+        working-directory: microchain-zk-signers
+
+      - name: Build contracts (Safe, Nexus, EntryPoint, ZK validator)
+        run: node scripts/build-integration-contracts.mjs microchain-zk-signers "$RUNNER_TEMP/zk-int-out"
+
+      - name: Integration tests
+        run: pnpm test:integration
+        env:
+          ZK_SIGNERS_OUT: ${{ runner.temp }}/zk-int-out
 
   compat-bb-latest:
     name: Compatibility — latest stable @aztec/bb.js (informational)

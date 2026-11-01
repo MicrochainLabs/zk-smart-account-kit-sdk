@@ -1,7 +1,7 @@
 {
   "name": "zk-smart-account-kit-sdk",
   "version": "0.1.5",
-  "description": "TypeScript SDK for ZK primitives for smart accounts\u2014 ZK Label, ZK Signer, ZK Scope",
+  "description": "TypeScript SDK for ZK primitives for smart accounts — ZK Label, ZK Signer, ZK Scope and private ZK MultiSig (Safe and Nexus)",
   "keywords": [
     "zk",
     "zero-knowledge",
@@ -10,7 +10,11 @@
     "erc-7579",
     "erc-4337",
     "poseidon",
-    "merkle"
+    "merkle",
+    "multisig",
+    "safe",
+    "nexus",
+    "erc-8039"
   ],
   "repository": {
     "type": "git",
@@ -61,6 +65,36 @@
         "default": "./dist/cjs/zk-scope/index.js"
       }
     },
+    "./zk-multisig": {
+      "import": {
+        "types": "./dist/esm/zk-multisig/index.d.ts",
+        "default": "./dist/esm/zk-multisig/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/zk-multisig/index.d.ts",
+        "default": "./dist/cjs/zk-multisig/index.js"
+      }
+    },
+    "./zk-multisig/safe": {
+      "import": {
+        "types": "./dist/esm/zk-multisig/safe.d.ts",
+        "default": "./dist/esm/zk-multisig/safe.js"
+      },
+      "require": {
+        "types": "./dist/cjs/zk-multisig/safe.d.ts",
+        "default": "./dist/cjs/zk-multisig/safe.js"
+      }
+    },
+    "./zk-multisig/nexus": {
+      "import": {
+        "types": "./dist/esm/zk-multisig/nexus.d.ts",
+        "default": "./dist/esm/zk-multisig/nexus.js"
+      },
+      "require": {
+        "types": "./dist/cjs/zk-multisig/nexus.d.ts",
+        "default": "./dist/cjs/zk-multisig/nexus.js"
+      }
+    },
     "./errors": {
       "import": {
         "types": "./dist/esm/errors.d.ts",
@@ -92,7 +126,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:unit": "vitest run --exclude test/e2e/**",
+    "test:unit": "vitest run --exclude \"test/e2e/**\" --exclude \"test/onchain/**\" --exclude \"test/integration/**\"",
     "test:e2e": "vitest run test/e2e",
     "test:coverage": "vitest run --coverage",
     "sync-circuits": "node scripts/sync-circuits.mjs",
@@ -102,7 +136,11 @@
     "prepublishOnly": "pnpm clean && pnpm build",
     "prepare": "husky || true",
     "smoke": "node scripts/smoke.mjs",
-    "audit:deps": "pnpm audit --prod --audit-level moderate"
+    "audit:deps": "pnpm audit --prod --audit-level moderate",
+    "sync-contracts": "node scripts/sync-contracts.mjs",
+    "test:onchain": "vitest run test/onchain",
+    "test:integration": "vitest run test/integration",
+    "build-integration-contracts": "node scripts/build-integration-contracts.mjs"
   },
   "dependencies": {
     "@iden3/js-crypto": "^1.0.3",

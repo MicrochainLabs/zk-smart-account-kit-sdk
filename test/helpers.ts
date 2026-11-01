@@ -28,7 +28,14 @@ export function testHash(label: string): number[] {
 
 const circuitsDir = join(import.meta.dirname, "fixtures", "circuits");
 
-export function loadCircuit(name: "zk_signers" | "zk_label_binding" | "zk_scope_validation"): any {
+export type CircuitName =
+    | "zk_signers"
+    | "zk_label_binding"
+    | "zk_scope_validation"
+    | "zk_multi_sig_ecdsa"
+    | "zk_multi_sig_ecdsa_private_state_validation";
+
+export function loadCircuit(name: CircuitName): any {
     return JSON.parse(readFileSync(join(circuitsDir, `${name}.json`), "utf8"));
 }
 
@@ -39,3 +46,10 @@ export const ADDRESSES: Address[] = Array.from(
 );
 
 export const HARDHAT_0: Address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+
+/** Deterministic viem accounts for multisig tests; `sign({ hash })` yields a 65-byte low-S `r||s||v` signature. */
+export function testAccounts(count: number, namespace = "multisig") {
+    return Array.from({ length: count }, (_, i) =>
+        privateKeyToAccount(keccak256(toBytes(`zk-smart-account-kit-sdk/test/${namespace}/${i}`))),
+    );
+}
