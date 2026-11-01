@@ -48,7 +48,10 @@ Useful scripts:
 |---|---|
 | `pnpm test` / `pnpm test:unit` / `pnpm test:e2e` | all tests / fast unit tests / end-to-end proof tests |
 | `pnpm test:coverage` | tests with coverage thresholds (what CI runs) |
-| `pnpm sync-circuits [path]` | refresh `test/fixtures/circuits` from a compiled zk-smart-account-kit checkout |
+| `pnpm test:onchain` | SDK proofs verified by the real Microchain contracts on Anvil (needs Foundry; skipped without `anvil`) |
+| `pnpm test:integration` | real Safe, Nexus and EntryPoint v0.7 (needs `ZK_SIGNERS_OUT`, see below) |
+| `pnpm sync-circuits [kit-target] [signers-target]` | refresh `test/fixtures/circuits` from compiled zk-smart-account-kit and microchain-zk-signers checkouts |
+| `pnpm sync-contracts <forge-out>` | refresh `test/fixtures/contracts` from a Foundry build of microchain-zk-signers |
 | `pnpm docs:api` | generate API docs into `docs/api` |
 | `pnpm audit:deps` | dependency audit |
 
@@ -86,6 +89,14 @@ Each primitive follows the same layout: `types.ts`, `tree.ts`, `circuit.ts`, `ab
 - Update the README and `CHANGELOG.md` (under `[Unreleased]`) for user-facing changes.
 
 ### Tests
+
+Four layers, each catching what the previous cannot: **unit** (fast, in-memory chain for the viem helpers), **e2e** (real circuits: witness, EVM proof, verification), **on-chain** (the SDK's proofs verified by the real Microchain contracts on Anvil — fixtures in `test/fixtures/contracts`) and **integration** (real Safe v1.4.1, Nexus and EntryPoint v0.7, built from source because third-party bytecode is not vendored):
+
+```bash
+OUT="$(mktemp -d)"   # private directory: the tests deploy the bytecode built here, so do not use a shared, predictable path
+node scripts/build-integration-contracts.mjs ../microchain-zk-signers "$OUT"   # needs forge, git, network
+ZK_SIGNERS_OUT="$OUT" pnpm test:integration
+```
 
 - Every change needs tests. Coverage thresholds are enforced in `vitest.config.ts` and must not be lowered.
 - Anything that affects a leaf, root, circuit input or calldata byte needs an **end-to-end test** in `test/e2e` proving the real circuit still accepts the SDK's output, plus a golden vector where one exists in the circuit tests.

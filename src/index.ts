@@ -7,6 +7,7 @@
  *
  *   import { buildLabelsTree, createZKLabels } from "zk-smart-account-kit-sdk/zk-label";
  *   import { parsePubKey, type PubKey }        from "zk-smart-account-kit-sdk/zk-signer";
+ *   import { createMultiSigState }              from "zk-smart-account-kit-sdk/zk-multisig";
  *
  * The root import re-exports every primitive for convenience:
  *
@@ -19,3 +20,4 @@ export { LeanIMT, type MerkleTreeLike, type HashFunction } from "./internal/merk
 export * from "./zk-label/index.js";
 export * from "./zk-signer/index.js";
 export * from "./zk-scope/index.js";
+export * from "./zk-multisig/index.js";

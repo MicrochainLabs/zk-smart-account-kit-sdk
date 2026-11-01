@@ -15,7 +15,9 @@
     "resolveJsonModule": true,
     "paths": {
       "zk-smart-account-kit-sdk": ["./src/index.ts"],
-      "zk-smart-account-kit-sdk/*": ["./src/*/index.ts"]
+      "zk-smart-account-kit-sdk/*": ["./src/*/index.ts"],
+      "zk-smart-account-kit-sdk/zk-multisig/safe": ["./src/zk-multisig/safe.ts"],
+      "zk-smart-account-kit-sdk/zk-multisig/nexus": ["./src/zk-multisig/nexus.ts"]
     }
   },
   "include": ["src/**/*", "test/**/*", "scripts/**/*", "examples/**/*", "*.config.ts"],

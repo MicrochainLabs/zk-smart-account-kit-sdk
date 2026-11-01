@@ -10,5 +10,13 @@
   "zk_scope_validation": {
     "noir_version": "1.0.0-beta.22+c57152f91260ecdb9faad4efc20abb14b6d2ece7",
     "sha256": "2f6cf8c8281ae9a70af8288ae59354e24a434babf2baed92404badf668cf0c6e"
+  },
+  "zk_multi_sig_ecdsa": {
+    "noir_version": "1.0.0-beta.22+c57152f91260ecdb9faad4efc20abb14b6d2ece7",
+    "sha256": "4ce73ec1866c35292a7b2c2221776a93510ec091cf7048029ef1efe6113300fd"
+  },
+  "zk_multi_sig_ecdsa_private_state_validation": {
+    "noir_version": "1.0.0-beta.22+c57152f91260ecdb9faad4efc20abb14b6d2ece7",
+    "sha256": "9b94ab0c9ecca6e17f4475ab433e6fdedd4af0f0b69b8e170552da6f0387aafa"
   }
 }
