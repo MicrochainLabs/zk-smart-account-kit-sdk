@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Releases are published automatically by `.github/workflows/release.yml` when the `version` in `package.json` is bumped and merged into `main` (contributor PRs go to `develop`).
 
-## [Unreleased]
+## [0.2.0] - 2026-11-01
 
 ### Added
 
@@ -30,6 +30,7 @@ Releases are published automatically by `.github/workflows/release.yml` when the
 
 ### Fixed
 
+- `DEFAULT_GAS.callGasLimit` (Nexus UserOperations) is raised from 3M to 5M: a state-root rotation (`updateStateRoot`, which verifies a proof inside the call) needs about 3.7M gas on current EVM versions and ran out of gas with the old default.
 - **Proofs could not be verified on-chain.** Every prover generated the default Barretenberg proof flavour, but the Solidity `HonkVerifier` contracts only accept the EVM one (`verifierTarget: "evm"`, keccak transcript, zero-knowledge) that the microchain-zk-signers and zk-smart-account-kit tooling use. Proofs are now generated for the EVM by default and verified locally before being returned (`ProveOptions.verify`). The previous end-to-end tests verified with the default flavour and therefore did not catch this; they now verify with the EVM flavour, and the multisig proofs are additionally verified by the real contracts on-chain.
 - A Barretenberg instance could silently die: the native backend connects to its prover process lazily and gives up after five seconds if the event loop is blocked, which witness generation does for the larger circuits ("Timeout connecting to bb socket"). Witness generation now runs before the instance is created, and `createBarretenberg()` returns a connected instance for sharing.
 - On Node.js 20.19 and 22.15, loading `@noir-lang/noir_js` after the first Barretenberg round-trip made it pick up its WASM dependencies (`@noir-lang/noirc_abi`, `@noir-lang/acvm_js`) from the wrong `node_modules`, and witness generation failed with `abiEncode is not a function` (Node.js 24 was unaffected). `createBarretenberg()` now loads `@noir-lang/noir_js` first, and requires both peers.

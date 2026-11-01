@@ -1,6 +1,6 @@
 {
   "name": "zk-smart-account-kit-sdk",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "description": "TypeScript SDK for ZK primitives for smart accounts — ZK Label, ZK Signer, ZK Scope and private ZK MultiSig (Safe and Nexus)",
   "keywords": [
     "zk",
