@@ -1,5 +1,6 @@
 import type { Hex, Address } from "viem";
-import type { LeanIMT } from "@zk-kit/lean-imt";
+import type { LeanIMT } from "../internal/merkle.js";
+import { InvalidArgumentError } from "../errors.js";
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 // Must stay in sync with lib/zk_scope/src/lib.nr.
@@ -13,13 +14,10 @@ export const MAX_PARAMS = 4;
 // ─── Constraint types ──────────────────────────────────────────────────────────
 
 export const PARAM_UNCONSTRAINED = 0 as const;
-export const PARAM_EXACT         = 1 as const;
-export const PARAM_RANGE_MAX     = 2 as const;
+export const PARAM_EXACT = 1 as const;
+export const PARAM_RANGE_MAX = 2 as const;
 
-export type ParamConstraintType =
-    | typeof PARAM_UNCONSTRAINED
-    | typeof PARAM_EXACT
-    | typeof PARAM_RANGE_MAX;
+export type ParamConstraintType = typeof PARAM_UNCONSTRAINED | typeof PARAM_EXACT | typeof PARAM_RANGE_MAX;
 
 // ─── Rule types ────────────────────────────────────────────────────────────────
 
@@ -59,19 +57,19 @@ export interface ScopeRule {
 /** Result of buildScopeTree. */
 export interface ScopeTree {
     /** The underlying LeanIMT instance. */
-    tree:      LeanIMT;
+    tree: LeanIMT;
     /** Poseidon Merkle root — stored on-chain in the validator. */
     scopeRoot: bigint;
     /** Computed leaf for each rule, in insertion order. */
-    leaves:    bigint[];
+    leaves: bigint[];
 }
 
 // ─── Proof types ───────────────────────────────────────────────────────────────
 
 /** Merkle membership proof for a scope rule, padded to SCOPE_MAX_DEPTH. */
 export interface ScopeMerkleProof {
-    merkle_proof_length:   number;
-    merkle_proof_indices:  number[];
+    merkle_proof_length: number;
+    merkle_proof_indices: boolean[];
     merkle_proof_siblings: Hex[];
 }
 
@@ -80,20 +78,20 @@ export interface ScopeMerkleProof {
 /** Full input object for the zk_scope_validation Noir circuit. */
 export interface ScopeCircuitInput {
     // Private: matching rule
-    rule_target:      Hex;
-    rule_selector:    Hex;
-    rule_value_max:   Hex;
+    rule_target: Hex;
+    rule_selector: Hex;
+    rule_value_max: Hex;
     rule_constraints: Array<{ constraint_type: number; value: Hex }>;
     // Private: decoded calldata
-    param_values:     Hex[];
+    param_values: Hex[];
     // Private: Merkle proof
-    proof_length:     number;
-    proof_indices:    number[];
-    proof_siblings:   Hex[];
+    proof_length: number;
+    proof_indices: boolean[];
+    proof_siblings: Hex[];
     // Public: transaction
-    txn_target:        Hex;
-    txn_selector:      Hex;
-    txn_value:         Hex;
+    txn_target: Hex;
+    txn_selector: Hex;
+    txn_value: Hex;
     txn_calldata_hash: Hex;
     // Public: on-chain
     scope_root: Hex;
@@ -101,13 +99,13 @@ export interface ScopeCircuitInput {
 
 /** Output from generateScopeProof. */
 export interface ScopeProofData {
-    proof:           Hex;
-    publicInputs:    Hex[];   // [txn_target, txn_selector, txn_value, txn_calldata_hash, scope_root]
-    txnTarget:       Hex;
-    txnSelector:     Hex;
-    txnValue:        Hex;
+    proof: Hex;
+    publicInputs: Hex[]; // [txn_target, txn_selector, txn_value, txn_calldata_hash, scope_root]
+    txnTarget: Hex;
+    txnSelector: Hex;
+    txnValue: Hex;
     txnCalldataHash: Hex;
-    scopeRoot:       Hex;
+    scopeRoot: Hex;
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -134,8 +132,9 @@ export function rangeMax(max: bigint): ParamConstraint {
 export function padConstraints(
     constraints: ParamConstraint[],
 ): [ParamConstraint, ParamConstraint, ParamConstraint, ParamConstraint] {
-    const padded = Array.from({ length: MAX_PARAMS }, (_, i) =>
-        constraints[i] ?? unconstrained()
-    );
+    if (constraints.length > MAX_PARAMS) {
+        throw new InvalidArgumentError(`At most ${MAX_PARAMS} constraints are supported; got ${constraints.length}.`);
+    }
+    const padded = Array.from({ length: MAX_PARAMS }, (_, i) => constraints[i] ?? unconstrained());
     return padded as [ParamConstraint, ParamConstraint, ParamConstraint, ParamConstraint];
 }

@@ -1,5 +1,5 @@
 /**
- * @microchain/zk-sdk — zk-label subpath
+ * zk-smart-account-kit-sdk — zk-label subpath
  *
  * Tree utilities and circuit input builders are browser-safe.
  * Import `./prove.js` separately when proof generation is needed (Node.js only).
@@ -46,6 +46,8 @@ export {
 } from "./abi.js";
 
 // Proof generation (Node.js, requires peer deps)
+export { createBarretenberg } from "../internal/prover.js";
+export type { ProveOptions, BarretenbergLike, VerifierTarget } from "../internal/prover.js";
 export { generateLabelBindingProof } from "./prove.js";
 
 // High-level factory (viem-style)

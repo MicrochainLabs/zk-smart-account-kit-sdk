@@ -1,0 +1,54 @@
+{
+  "ZKMultiSigEcdsaFactory": {
+    "solc": "0.8.29+commit.ab55807c",
+    "sha256": "329b4f9df01a4b471b8b610320bb865d3e74f965541734eb514a3ae3aaef3635"
+  },
+  "ZKMultiSigEcdsaSingleton": {
+    "solc": "0.8.29+commit.ab55807c",
+    "sha256": "b0dca65c636df11d2d3c4a4ef2797bc6af1d3f26055dcf8788ccf889aff131fc"
+  },
+  "ZKMultiSigEcdsaProxy": {
+    "solc": "0.8.29+commit.ab55807c",
+    "sha256": "1c3e3a44ad702121f2106e531f337315f540fa86f010e40c8a4ed139a440ef18"
+  },
+  "ZKMultiSigValidator": {
+    "solc": "0.8.29+commit.ab55807c",
+    "sha256": "cb7433802a9a107664162044b09b69275ac7834a118ab9f2aeb65a077549b83c"
+  },
+  "ZKMultiSigValidatorFactory": {
+    "solc": "0.8.29+commit.ab55807c",
+    "sha256": "68aabf72c433a889b5230c8a9be3dfff23dd9fc0c6d30371345f63c2c315967c"
+  },
+  "ZKMultiSigEcdsaProofVerifier": {
+    "solc": "0.8.29+commit.ab55807c",
+    "sha256": "e20052413f0f7df47628b5036d35c39b6af23aa3a978bbe3c87ad7a0c3ae490c"
+  },
+  "PrivateStateValidationProofVerifier": {
+    "solc": "0.8.29+commit.ab55807c",
+    "sha256": "3e2c38c69240d4cbdf7772bd84c756fbb29ee2eea31b54fe2be7b0b2e4637675"
+  },
+  "TxHonkVerifier": {
+    "solc": "0.8.29+commit.ab55807c",
+    "sha256": "0208eb9458c403e83cbdc112949f1e54faf8a1ded5b72c484c828f13b814ad47"
+  },
+  "TxRelationsLib": {
+    "solc": "0.8.29+commit.ab55807c",
+    "sha256": "dff92f7c1c46c572f07551793d5dd1bfbf97e4ada7acd4e7e1c72aad974c38b9"
+  },
+  "TxZKTranscriptLib": {
+    "solc": "0.8.29+commit.ab55807c",
+    "sha256": "6f6eb11350dc8322baf8c7ca5c738adb220d6ae37507a3f770f67eeb997eb6f2"
+  },
+  "StateHonkVerifier": {
+    "solc": "0.8.29+commit.ab55807c",
+    "sha256": "2a9f5bbd6651f468ef491354b861d0999095bab5474a3d2adbac84e1392d013d"
+  },
+  "StateRelationsLib": {
+    "solc": "0.8.29+commit.ab55807c",
+    "sha256": "f52b02caee70ab6033f81f3500d3c945018c9362a70253926221fda251ef9279"
+  },
+  "StateZKTranscriptLib": {
+    "solc": "0.8.29+commit.ab55807c",
+    "sha256": "f1b649aafede5efda72220dea69fd49a09fb7114511746c92d09cfec9583fb5e"
+  }
+}

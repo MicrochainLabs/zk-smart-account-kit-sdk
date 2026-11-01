@@ -1,56 +1,61 @@
 /**
- * @microchain/zk-sdk — zk-multisig subpath
+ * zk-smart-account-kit-sdk — zk-multisig subpath
  *
- * M-of-N ECDSA multi-signature ZK primitives.
+ * Private M-of-N ECDSA multisig: a hiding commitment to a private signer set and threshold, and ZK
+ * proofs that authorise transactions for Safe (`zk-multisig/safe`) and ERC-7579 Nexus accounts
+ * (`zk-multisig/nexus`). Mirrors microchain-zk-signers.
  *
- * Tree utilities, circuit input builders, and ABI helpers are browser-safe.
- * Import `./prove.js` separately when proof generation is needed (Node.js only).
+ * State, tree, circuit-input and ABI helpers are browser-safe. Proof generation (`./prove.js`) is Node.js only.
  */
 
 // Constants & types
 export {
     MAX_SIGNERS,
     MAX_THRESHOLD,
-    SECP256K1_G_X,
-    SECP256K1_G_Y,
-    NIL_PUBKEY,
+    MULTISIG_PUBLIC_INPUTS,
     NIL_SIGNATURE,
-    type PubKey,
-    type ECDSASignature,
-    type SignerEntry,
-    type SignersTree,
-    type SignerMerkleProof,
-    type ActiveSigner,
+    type SignersFormat,
+    type MultiSigConfig,
+    type MultiSigTree,
+    type MultiSigState,
     type MultiSigCircuitInput,
-    type PrivateStateValidationCircuitInput,
+    type StateValidationCircuitInput,
     type MultiSigProofData,
-    type PrivateStateValidationProofData,
+    type StateValidationProofData,
 } from "./types.js";
 
-// Leaf encoding & hashing
-export {
-    computeSignerLeaf,
-    signersHash,
-} from "./leaf.js";
+// State root & salt
+export { computeStateRoot, generateSalt, parseSalt, saltToHex, fieldToBytes32 } from "./state-root.js";
 
-// Merkle tree
-export { buildSignersTree, getSignerMerkleProof } from "./tree.js";
+// Signers tree
+export { sortSigners, buildMultiSigTree, getMultiSigMerkleProof } from "./tree.js";
+
+// Private configuration: derivation and backup
+export { createMultiSigState, serializeMultiSigState, parseMultiSigState, type MultiSigStateInput } from "./state.js";
 
 // Circuit input builders (browser-safe)
 export {
-    computeOnChainStateRoot,
+    recoverMultiSigSigner,
     buildMultiSigCircuitInput,
-    buildPrivateStateValidationCircuitInput,
+    buildStateValidationCircuitInput,
+    type RecoveredSigner,
+    type HashInput,
 } from "./circuit.js";
 
-// ABI encoding (browser-safe)
+// Public inputs encoding (browser-safe)
 export {
-    encodeMultiSigInitData,
+    buildMultiSigPublicInputs,
     encodeMultiSigPublicInputs,
-    encodeUpdateStateRootData,
-    encodeMultiSigProofCalldata,
-    encodePrivateStateValidationProofCalldata,
+    buildStateValidationPublicInputs,
+    encodeStateValidationPublicInputs,
 } from "./abi.js";
 
 // Proof generation (Node.js, requires peer deps)
-export { generateMultiSigProof, generatePrivateStateValidationProof } from "./prove.js";
+export {
+    generateMultiSigProof,
+    generateStateValidationProof,
+    ZK_MULTISIG_CIRCUIT_PARAMS,
+    ZK_MULTISIG_STATE_VALIDATION_CIRCUIT_PARAMS,
+} from "./prove.js";
+export { createBarretenberg } from "../internal/prover.js";
+export type { ProveOptions, BarretenbergLike, VerifierTarget } from "../internal/prover.js";

@@ -5,8 +5,30 @@
  */
 
 import { buildScopeCircuitInput } from "./circuit.js";
-import { toHex, type Address, type Hex } from "viem";
+import { assertCircuit } from "../internal/compiled-circuit.js";
+import { proveCircuit, type ProveOptions } from "../internal/prover.js";
+import type { Address, Hex } from "viem";
 import type { ScopeRule, ScopeTree, ScopeProofData } from "./types.js";
+
+/** Parameter names of the `zk_scope_validation` circuit, in ABI order. */
+export const ZK_SCOPE_VALIDATION_CIRCUIT_PARAMS = [
+    "rule_target",
+    "rule_selector",
+    "rule_value_max",
+    "rule_constraints",
+    "param_values",
+    "proof_length",
+    "proof_indices",
+    "proof_siblings",
+    "txn_target",
+    "txn_selector",
+    "txn_value",
+    "txn_calldata_hash",
+    "scope_root",
+] as const;
+
+/** txn_target, txn_selector, txn_value, txn_calldata_hash, scope_root. */
+const PUBLIC_INPUT_COUNT = 5;
 
 /**
  * Generate a ZK Scope proof attesting that the given transaction is within
@@ -19,22 +41,24 @@ import type { ScopeRule, ScopeTree, ScopeProofData } from "./types.js";
  * @param matchingRule - The scope rule that permits this transaction (private).
  * @param scopeTree    - Scope tree returned by buildScopeTree.
  * @param circuit      - Compiled zk_scope_validation artifact (parsed JSON).
+ * @param options      - Optional {@link ProveOptions} (e.g. a shared Barretenberg instance).
+ * @throws {InvalidArgumentError} if inputs are malformed or the transaction violates `matchingRule`.
+ * @throws {NotFoundError} if `matchingRule` is not in the tree.
+ * @throws {InvalidCircuitError} if `circuit` is not the zk_scope_validation artifact.
+ * @throws {MissingPeerDependencyError} if the proving peer dependencies are not installed.
+ * @throws {ProofGenerationError} if witness execution or proving fails.
  */
 export async function generateScopeProof(
-    txnTarget:    Address,
-    txnSelector:  Hex,
-    txnValue:     bigint,
-    paramValues:  bigint[],
+    txnTarget: Address,
+    txnSelector: Hex,
+    txnValue: bigint,
+    paramValues: bigint[],
     matchingRule: ScopeRule,
-    scopeTree:    ScopeTree,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    circuit:      any,
+    scopeTree: ScopeTree,
+    circuit: unknown,
+    options?: ProveOptions,
 ): Promise<ScopeProofData> {
-    const [{ UltraHonkBackend }, { Noir }] = await Promise.all([
-        import("@aztec/bb.js"),
-        import("@noir-lang/noir_js"),
-    ]);
-
+    const compiled = assertCircuit(circuit, "zk_scope_validation", ZK_SCOPE_VALIDATION_CIRCUIT_PARAMS);
     const circuitInput = buildScopeCircuitInput(
         txnTarget,
         txnSelector,
@@ -45,19 +69,20 @@ export async function generateScopeProof(
         scopeTree.scopeRoot,
     );
 
-    const backend = new UltraHonkBackend(circuit.bytecode);
-    const noir    = new Noir(circuit);
-
-    const { witness }             = await noir.execute(circuitInput);
-    const { proof, publicInputs } = await backend.generateProof(witness);
+    const { proof, publicInputs } = await proveCircuit(
+        compiled,
+        circuitInput as unknown as Record<string, unknown>,
+        PUBLIC_INPUT_COUNT,
+        options,
+    );
 
     return {
-        proof:           toHex(proof) as Hex,
-        publicInputs:    publicInputs as Hex[],
-        txnTarget:       publicInputs[0] as Hex,
-        txnSelector:     publicInputs[1] as Hex,
-        txnValue:        publicInputs[2] as Hex,
-        txnCalldataHash: publicInputs[3] as Hex,
-        scopeRoot:       publicInputs[4] as Hex,
+        proof,
+        publicInputs,
+        txnTarget: publicInputs[0],
+        txnSelector: publicInputs[1],
+        txnValue: publicInputs[2],
+        txnCalldataHash: publicInputs[3],
+        scopeRoot: publicInputs[4],
     };
 }

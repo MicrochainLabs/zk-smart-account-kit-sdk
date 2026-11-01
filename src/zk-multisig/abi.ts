@@ -1,113 +1,36 @@
 /**
- * ABI encoding helpers for on-chain interactions with ZK MultiSig validators.
- *
- * These match the calldata layout expected by ZKMultiSigEcdsaSingleton and
- * ZKMultiSigValidator (ERC-7579). Browser-safe: no proving deps required.
+ * Public-input encoding of the ZK MultiSig circuits, in the layout the on-chain ERC-8039 verifier
+ * adapters and the Safe/Nexus contracts use. Browser-safe.
  */
 
-import {
-    encodeAbiParameters,
-    parseAbiParameters,
-    toHex,
-    type Hex,
-} from "viem";
-import type { MultiSigProofData, PrivateStateValidationProofData } from "./types.js";
-
-// ─── Initialization ──────────────────────────────────────────────────────────
+import { encodeAbiParameters, parseAbiParameters, toHex, type Hex } from "viem";
+import { toFieldElement } from "../internal/validation.js";
+import { normalizeHash, type HashInput } from "./circuit.js";
 
 /**
- * Encode the initialisation calldata passed to the validator during module
- * installation (e.g. ZKMultiSigValidator.onInstall / initData).
+ * The 33 public inputs of `zk_multi_sig_ecdsa` as `bytes32` words: one word per byte of the
+ * transaction hash, then the state root. This is the array the contracts pass to the verifier and
+ * equals the `publicInputs` of a generated proof.
  *
- * Layout: abi.encode(bytes32 onChainStateRoot)
+ * @throws {InvalidArgumentError} if the hash is not 32 bytes or the root is not a field element.
  */
-export function encodeMultiSigInitData(onChainStateRoot: bigint | Hex): Hex {
-    const root = typeof onChainStateRoot === "bigint"
-        ? onChainStateRoot
-        : BigInt(onChainStateRoot);
-    return encodeAbiParameters(
-        parseAbiParameters("bytes32"),
-        [toHex(root, { size: 32 })],
-    );
+export function buildMultiSigPublicInputs(txnHash: HashInput, stateRoot: bigint | Hex): Hex[] {
+    const hash = normalizeHash(txnHash);
+    const root = toFieldElement(stateRoot, "stateRoot");
+    return [...hash.map((byte) => toHex(byte, { size: 32 })), toHex(root, { size: 32 })];
 }
 
-// ─── Public inputs ───────────────────────────────────────────────────────────
-
-/**
- * Encode the two semantic public inputs (txnHash, onChainStateRoot) for a
- * ZK MultiSig proof as ABI-encoded bytes32 values.
- *
- * Used by the on-chain verifier to confirm which transaction and state root
- * the proof was generated against.
- *
- * @param txnHash         - 32-byte transaction hash (keccak256 of signed payload).
- * @param onChainStateRoot - Poseidon commitment of (signersRoot, threshold_hash).
- */
-export function encodeMultiSigPublicInputs(
-    txnHash:          Hex | number[],
-    onChainStateRoot: bigint | Hex,
-): Hex {
-    const hashHex = Array.isArray(txnHash)
-        ? (toHex(new Uint8Array(txnHash)) as Hex)
-        : txnHash;
-    const root = typeof onChainStateRoot === "bigint"
-        ? onChainStateRoot
-        : BigInt(onChainStateRoot);
-
-    return encodeAbiParameters(
-        parseAbiParameters("bytes32, bytes32"),
-        [hashHex as `0x${string}`, toHex(root, { size: 32 })],
-    );
+/** `abi.encode(bytes32[33])` as dynamic array, the `publicInputs` argument of `IERC8039.verifyProof`. */
+export function encodeMultiSigPublicInputs(txnHash: HashInput, stateRoot: bigint | Hex): Hex {
+    return encodeAbiParameters(parseAbiParameters("bytes32[]"), [buildMultiSigPublicInputs(txnHash, stateRoot)]);
 }
 
-// ─── State root update ───────────────────────────────────────────────────────
-
-/**
- * Encode the calldata for updating the on-chain state root.
- *
- * A new state root is submitted together with a ZK proof (either
- * zk_multi_sig_ecdsa or zk_multi_sig_ecdsa_private_state_validation) that
- * authorises the update.
- *
- * Layout: abi.encode(bytes32 newStateRoot, bytes proof)
- */
-export function encodeUpdateStateRootData(
-    newStateRoot: bigint | Hex,
-    proof:        Hex,
-): Hex {
-    const root = typeof newStateRoot === "bigint" ? newStateRoot : BigInt(newStateRoot);
-    return encodeAbiParameters(
-        parseAbiParameters("bytes32, bytes"),
-        [toHex(root, { size: 32 }), proof],
-    );
+/** The single public input of the state-validation circuit: the state root. */
+export function buildStateValidationPublicInputs(stateRoot: bigint | Hex): Hex[] {
+    return [toHex(toFieldElement(stateRoot, "stateRoot"), { size: 32 })];
 }
 
-// ─── Proof submission ────────────────────────────────────────────────────────
-
-/**
- * Convenience wrapper: encode the calldata to submit a multi-sig proof for
- * transaction approval.
- *
- * Layout: abi.encode(bytes proof, bytes32 txnHash, bytes32 onChainStateRoot)
- */
-export function encodeMultiSigProofCalldata(proofData: MultiSigProofData): Hex {
-    return encodeAbiParameters(
-        parseAbiParameters("bytes, bytes32, bytes32"),
-        [proofData.proof, proofData.txnHash as `0x${string}`, proofData.onChainStateRoot as `0x${string}`],
-    );
-}
-
-/**
- * Convenience wrapper: encode the calldata to submit a private state
- * validation proof (e.g. for state root migration / re-keying flows).
- *
- * Layout: abi.encode(bytes proof, bytes32 onChainStateRoot)
- */
-export function encodePrivateStateValidationProofCalldata(
-    proofData: PrivateStateValidationProofData,
-): Hex {
-    return encodeAbiParameters(
-        parseAbiParameters("bytes, bytes32"),
-        [proofData.proof, proofData.onChainStateRoot as `0x${string}`],
-    );
+/** `abi.encode(bytes32[1])` as dynamic array, the `publicInputs` argument of the state-validation verifier. */
+export function encodeStateValidationPublicInputs(stateRoot: bigint | Hex): Hex {
+    return encodeAbiParameters(parseAbiParameters("bytes32[]"), [buildStateValidationPublicInputs(stateRoot)]);
 }

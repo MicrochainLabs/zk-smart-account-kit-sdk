@@ -7,11 +7,12 @@
  *
  * Noir source:
  *   lib/zk_signer/src/lib.nr
- *   zk_multi_sig_ecdsa/src/main.nr
  */
 
 import type { Hex, Address } from "viem";
-import type { LeanIMT } from "@zk-kit/lean-imt";
+import type { LeanIMT } from "../internal/merkle.js";
+import { InvalidArgumentError } from "../errors.js";
+import { assertBytes } from "../internal/validation.js";
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -35,10 +36,14 @@ export const ADDRESS_BYTES = 20;
  * multi-signer arrays. Matches is_nil_pubkey in lib/zk_signer/src/lib.nr.
  */
 export const NIL_PUBKEY: PubKey = {
-    x: [121,190,102,126,249,220,187,172, 85,160, 98,149,206,135, 11,  7,
-          2,155,252,219, 45,206, 40,217, 89,242,129, 91, 22,248, 23,152],
-    y: [ 72, 58,218,119, 38,163,196,101, 93,164,251,252, 14, 17,  8,168,
-        253, 23,180, 72,166,133, 84, 25,156, 71,208,143,251, 16,212,184],
+    x: [
+        121, 190, 102, 126, 249, 220, 187, 172, 85, 160, 98, 149, 206, 135, 11, 7, 2, 155, 252, 219, 45, 206, 40, 217,
+        89, 242, 129, 91, 22, 248, 23, 152,
+    ],
+    y: [
+        72, 58, 218, 119, 38, 163, 196, 101, 93, 164, 251, 252, 14, 17, 8, 168, 253, 23, 180, 72, 166, 133, 84, 25, 156,
+        71, 208, 143, 251, 16, 212, 184,
+    ],
 };
 
 // ─── Registry types ───────────────────────────────────────────────────────────
@@ -63,8 +68,8 @@ export interface SignersTree {
 export interface SignerMerkleProof {
     /** Actual number of sibling hashes (0–4). */
     merkle_proof_length: number;
-    /** Direction bits: 0 = proved leaf is the left child, 1 = right child. */
-    merkle_proof_indices: number[];
+    /** Direction bits: false = proved leaf is the left child, true = right child. */
+    merkle_proof_indices: boolean[];
     /** Sibling hashes at each level; unused slots are "0x0". */
     merkle_proof_siblings: Hex[];
 }
@@ -76,8 +81,8 @@ export interface SignerMerkleProof {
  * Maps to `struct PubKey { x: [u8; 32], y: [u8; 32] }` in Noir.
  */
 export interface PubKey {
-    x: number[];  // 32 bytes, big-endian
-    y: number[];  // 32 bytes, big-endian
+    x: number[]; // 32 bytes, big-endian
+    y: number[]; // 32 bytes, big-endian
 }
 
 /**
@@ -85,15 +90,15 @@ export interface PubKey {
  * Maps to `struct Signature { r: [u8; 32], s: [u8; 32] }` in Noir.
  */
 export interface ECDSASignature {
-    r: number[];  // 32 bytes, big-endian
-    s: number[];  // 32 bytes, big-endian
+    r: number[]; // 32 bytes, big-endian
+    s: number[]; // 32 bytes, big-endian
 }
 
 /**
  * Message hash input for the ECDSA circuit.
  * Typically `keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", payload))`.
  */
-export type MessageHash = number[];  // [u8; 32]
+export type MessageHash = number[]; // [u8; 32]
 
 // ─── Circuit I/O ───────────────────────────────────────────────────────────────
 
@@ -109,21 +114,21 @@ export type MessageHash = number[];  // [u8; 32]
  */
 export interface ZKSignerCircuitInput {
     // Private inputs
-    pubkey:         { x: number[]; y: number[] };  // PubKey — secp256k1 uncompressed key
-    signature:      number[];    // Signature = [u8; 64] — r(32) || s(32), low-S, no Ethereum prefix
-    proof_length:   number;      // u32 — actual Merkle path depth (0 for a single-signer tree)
-    proof_index:    number[];    // [u1; SIGNERS_MAX_DEPTH] — direction bits (0 = left, 1 = right)
-    proof_siblings: Hex[];       // [Field; SIGNERS_MAX_DEPTH] — sibling hashes; unused slots = "0x0"
+    pubkey: { x: number[]; y: number[] }; // PubKey — secp256k1 uncompressed key
+    signature: number[]; // Signature = [u8; 64] — r(32) || s(32), low-S, no Ethereum prefix
+    proof_length: number; // u32 — actual Merkle path depth (0 for a single-signer tree)
+    proof_index: boolean[]; // [bool; SIGNERS_MAX_DEPTH] — direction bits (false = left, true = right)
+    proof_siblings: Hex[]; // [Field; SIGNERS_MAX_DEPTH] — sibling hashes; unused slots = "0x0"
     // Public inputs
-    txn_hash:     number[];  // Hash = [u8; 32] — transaction hash that was signed
-    signers_root: Hex;       // Field — Merkle root of authorized signers stored on-chain
+    txn_hash: number[]; // Hash = [u8; 32] — transaction hash that was signed
+    signers_root: Hex; // Field — Merkle root of authorized signers stored on-chain
 }
 
 /**
  * Output from a ZK Signer proof (zk_signers circuit).
  */
 export interface ZKSignerProofData {
-    proof:        Hex;
+    proof: Hex;
     /**
      * 33 raw public inputs:
      *   publicInputs[0..31] — txn_hash bytes (each byte serialised as one BN254 field element)
@@ -131,21 +136,22 @@ export interface ZKSignerProofData {
      */
     publicInputs: Hex[];
     /** Transaction hash as a 32-byte hex string. */
-    txnHash:      Hex;
+    txnHash: Hex;
     /** Signers Merkle root. */
-    signersRoot:  Hex;
+    signersRoot: Hex;
 }
 
-// ─── Encoding helpers (types only — implementations in separate file if needed) ─
+// ─── Encoding helpers ──────────────────────────────────────────────────────────
 
 /**
- * Parse a compressed 65-byte public key (0x04 || x || y) into PubKey.
- * Throws if the prefix is not 0x04 (uncompressed required).
+ * Parse an uncompressed 65-byte public key (0x04 || x || y) into PubKey.
+ *
+ * @throws {InvalidArgumentError} if the key is not 65 bytes or does not start with 0x04.
  */
 export function parsePubKey(bytes: Uint8Array | number[]): PubKey {
-    const buf = Array.from(bytes);
-    if (buf[0] !== 0x04 || buf.length !== 65) {
-        throw new Error("Expected uncompressed public key: 0x04 || x(32) || y(32)");
+    const buf = assertBytes(bytes, 65, "Uncompressed public key (0x04 || x(32) || y(32))");
+    if (buf[0] !== 0x04) {
+        throw new InvalidArgumentError("Expected uncompressed public key: first byte must be 0x04.");
     }
     return {
         x: buf.slice(1, 33),
@@ -154,13 +160,19 @@ export function parsePubKey(bytes: Uint8Array | number[]): PubKey {
 }
 
 /**
- * Parse a 64-byte raw signature (r || s) into ECDSASignature.
+ * Parse a raw signature (r || s, optionally followed by a recovery byte) into ECDSASignature.
+ * The recovery byte is ignored: the circuit derives it from the public key.
+ *
+ * @throws {InvalidArgumentError} if the input is not exactly 64 or 65 bytes.
  */
 export function parseSignature(bytes: Uint8Array | number[]): ECDSASignature {
-    const buf = Array.from(bytes);
-    if (buf.length < 64) {
-        throw new Error(`Signature too short: got ${buf.length} bytes, expected >= 64`);
+    const length = (bytes as { length?: number } | null)?.length;
+    if (length !== 64 && length !== 65) {
+        throw new InvalidArgumentError(
+            `Signature must be 64 (r||s) or 65 (r||s||v) bytes; got ${length ?? typeof bytes}.`,
+        );
     }
+    const buf = assertBytes(bytes, length, "signature");
     return {
         r: buf.slice(0, 32),
         s: buf.slice(32, 64),

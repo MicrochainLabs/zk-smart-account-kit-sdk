@@ -1,5 +1,5 @@
 /**
- * @microchain/zk-sdk — zk-signer subpath
+ * zk-smart-account-kit-sdk — zk-signer subpath
  *
  * Tree utilities and circuit input builders are browser-safe.
  * Import `./prove.js` separately when proof generation is needed (Node.js only).
@@ -36,11 +36,9 @@ export { buildSignersTree, getSignerMerkleProof } from "./tree.js";
 export { buildZKSignerCircuitInput, buildZKSignerCircuitInputFromProof } from "./circuit.js";
 
 // ABI encoding (browser-safe)
-export {
-    encodeSignersInitData,
-    encodeZKSignerPublicInputs,
-    encodeZKSignerProofCalldata,
-} from "./abi.js";
+export { encodeSignersInitData, encodeZKSignerPublicInputs, encodeZKSignerProofCalldata } from "./abi.js";
 
 // Proof generation (Node.js, requires peer deps)
+export { createBarretenberg } from "../internal/prover.js";
+export type { ProveOptions, BarretenbergLike, VerifierTarget } from "../internal/prover.js";
 export { generateZKSignerProof } from "./prove.js";

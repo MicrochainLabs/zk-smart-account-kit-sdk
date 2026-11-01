@@ -1,0 +1,8 @@
+zk-smart-account-kit-sdk
+Copyright 2026 Microchain Labs
+
+This product includes software developed by Microchain Labs (https://microchainlabs.xyz).
+
+Licensed under the Apache License, Version 2.0. Third-party dependencies
+(including viem, @zk-kit/lean-imt and @iden3/js-crypto) are distributed under
+their own licenses.

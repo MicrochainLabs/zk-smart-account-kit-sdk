@@ -1,132 +1,203 @@
 /**
- * Circuit input builders for the ZK MultiSig Noir circuits.
+ * Circuit input builders for `zk_multi_sig_ecdsa` and `zk_multi_sig_ecdsa_private_state_validation`.
  *
- * This module is browser-safe (no Node.js builtins, no heavy proving deps).
- * Import `./prove.js` for actual proof generation.
+ * Browser-safe (no Node.js builtins, no proving deps). Import `./prove.js` for proof generation.
  */
 
-import { poseidon } from "@iden3/js-crypto";
-import { toHex, type Hex } from "viem";
-import { getSignerMerkleProof } from "./tree.js";
+import { secp256k1 } from "@noble/curves/secp256k1";
+import { bytesToHex, hexToBytes, toHex, type Address, type Hex } from "viem";
+import { publicKeyToAddress } from "viem/utils";
+import { ChainStateError, InvalidArgumentError } from "../errors.js";
+import { SECP256K1_ORDER, assertBytes, assertHexBytes, toFieldElement } from "../internal/validation.js";
+import { NIL_PUBKEY, SIGNERS_MAX_DEPTH, type PubKey } from "../zk-signer/types.js";
+import { computeStateRoot } from "./state-root.js";
+import { createMultiSigState } from "./state.js";
+import { getMultiSigMerkleProof } from "./tree.js";
 import {
-    SIGNERS_MAX_DEPTH,
     MAX_SIGNERS,
-    NIL_PUBKEY,
     NIL_SIGNATURE,
-    type ActiveSigner,
-    type SignersTree,
     type MultiSigCircuitInput,
-    type PrivateStateValidationCircuitInput,
+    type MultiSigConfig,
+    type StateValidationCircuitInput,
 } from "./types.js";
 
-// ─── State root ──────────────────────────────────────────────────────────────
-
-/**
- * Compute the on-chain state root committing to (signersRoot, threshold).
- *
- * Formula (matches compute_state_root in lib/zk_multisig/src/lib.nr):
- *
- *   threshold_hash = Poseidon1([threshold as Field])
- *   state_root     = binary_merkle_root(
- *                      poseidon2, signersRoot, depth=1, indices=[0], siblings=[threshold_hash]
- *                    )
- *                  = Poseidon2([signersRoot, threshold_hash])
- *
- * The binary_merkle_root at depth=1 with index_bit=0 (signersRoot is the left
- * child) simplifies to a single Poseidon2 call.
- */
-export function computeOnChainStateRoot(signersRoot: bigint, threshold: number): bigint {
-    const thresholdHash = poseidon.hash([BigInt(threshold)]);
-    return poseidon.hash([signersRoot, thresholdHash]);
+/** A signature with the signer it recovers to. */
+export interface RecoveredSigner {
+    address: Address;
+    pubKey: PubKey;
+    /** `r || s`, 64 bytes, as the circuit expects. */
+    signature: number[];
 }
 
-// ─── zk_multi_sig_ecdsa ──────────────────────────────────────────────────────
+/** A 32-byte transaction hash as a `0x…` string, `Uint8Array` or `number[]`. */
+export type HashInput = Hex | Uint8Array | readonly number[];
+
+/** Normalises a 32-byte hash to `number[]`. @throws {InvalidArgumentError} if it is not exactly 32 bytes. */
+export function normalizeHash(hash: HashInput, name = "txnHash"): number[] {
+    if (typeof hash === "string") {
+        return Array.from(hexToBytes(assertHexBytes(hash, 32, name)));
+    }
+    return assertBytes(hash, 32, name);
+}
 
 /**
- * Build the full circuit input for zk_multi_sig_ecdsa.
+ * Recovers the signer of a 65-byte `r || s || v` signature over the raw 32-byte `hash` (no Ethereum
+ * message prefix — sign with `account.sign({ hash })` or EIP-712 `signTypedData`, whose digest is the hash).
  *
- * @param activeSigners - Signers providing evidence, in strictly increasing
- *                        Ethereum address order (circuit-enforced).
- * @param threshold     - Minimum number of valid signatures required.
- * @param signersTree   - Signers Merkle tree from buildSignersTree.
- * @param txnHash       - 32-byte transaction hash as a byte array.
- *
- * Inactive slots (length < MAX_SIGNERS) are automatically padded with the
- * NIL_PUBKEY sentinel (secp256k1 G) and zero signatures.
- *
- * @throws if activeSigners.length > MAX_SIGNERS.
+ * @param signature 65-byte hex signature with `v` in `{0, 1, 27, 28}`. Must be low-S, as produced by
+ *                  Ethereum wallets and `viem`.
+ * @throws {InvalidArgumentError} if the signature is malformed, high-S, or does not recover to a public key.
  */
-export function buildMultiSigCircuitInput(
-    activeSigners: ActiveSigner[],
-    threshold:     number,
-    signersTree:   SignersTree,
-    txnHash:       number[],
-): MultiSigCircuitInput {
-    if (activeSigners.length > MAX_SIGNERS) {
-        throw new RangeError(
-            `Too many active signers: got ${activeSigners.length}, max is ${MAX_SIGNERS}.`
-        );
+export function recoverMultiSigSigner(hash: HashInput, signature: Hex): RecoveredSigner {
+    const digest = Uint8Array.from(normalizeHash(hash));
+    const bytes = hexToBytes(assertHexBytes(signature, 65, "signature"));
+
+    const v = bytes[64];
+    if (v !== 0 && v !== 1 && v !== 27 && v !== 28) {
+        throw new InvalidArgumentError(`signature recovery byte v must be 0, 1, 27 or 28; got ${v}.`);
+    }
+    const r = BigInt(bytesToHex(bytes.subarray(0, 32)));
+    const s = BigInt(bytesToHex(bytes.subarray(32, 64)));
+    if (r === 0n || r >= SECP256K1_ORDER) {
+        throw new InvalidArgumentError("signature r is out of range.");
+    }
+    if (s === 0n || s > SECP256K1_ORDER / 2n) {
+        throw new InvalidArgumentError("signature must be low-S (0 < s <= n/2); normalise it before proving.");
     }
 
-    const onChainStateRoot = computeOnChainStateRoot(signersTree.signersRoot, threshold);
-
-    const signers:          { x: number[]; y: number[] }[] = [];
-    const signatures:       number[][] = [];
-    const proofLengths:     number[] = [];
-    const indices:          number[][] = [];
-    const siblings:         Hex[][] = [];
-
-    for (let i = 0; i < MAX_SIGNERS; i++) {
-        if (i < activeSigners.length) {
-            const { pubKey, signature, address } = activeSigners[i];
-            const proof = getSignerMerkleProof(signersTree.tree, address);
-            signers.push(pubKey);
-            signatures.push(signature);
-            proofLengths.push(proof.merkle_proof_length);
-            indices.push(proof.merkle_proof_indices);
-            siblings.push(proof.merkle_proof_siblings);
-        } else {
-            signers.push(NIL_PUBKEY);
-            signatures.push(NIL_SIGNATURE);
-            proofLengths.push(0);
-            indices.push(new Array(SIGNERS_MAX_DEPTH).fill(0));
-            siblings.push(new Array(SIGNERS_MAX_DEPTH).fill("0x0") as Hex[]);
-        }
+    let point: Uint8Array;
+    try {
+        point = new secp256k1.Signature(r, s)
+            .addRecoveryBit(v >= 27 ? v - 27 : v)
+            .recoverPublicKey(digest)
+            .toRawBytes(false);
+    } catch {
+        throw new InvalidArgumentError("signature does not recover to a valid public key for this hash.");
     }
 
     return {
-        signers,
-        threshold,
-        signers_root:        toHex(signersTree.signersRoot),
-        merkle_proof_length: proofLengths,
-        indices,
-        siblings,
-        signatures,
-        txn_hash:            txnHash,
-        on_chain_state_root: toHex(onChainStateRoot),
+        address: publicKeyToAddress(bytesToHex(point)),
+        pubKey: { x: Array.from(point.subarray(1, 33)), y: Array.from(point.subarray(33, 65)) },
+        signature: Array.from(bytes.subarray(0, 64)),
     };
 }
 
-// ─── zk_multi_sig_ecdsa_private_state_validation ────────────────────────────
+/**
+ * Builds the input of `zk_multi_sig_ecdsa` from the private configuration and the collected signatures.
+ *
+ * Signatures are recovered, ordered by signer address (the circuit requires strictly increasing
+ * addresses), matched against the private signer set with Merkle proofs, and padded with NIL slots.
+ * Mistakes fail here with a precise message instead of as an opaque witness failure:
+ *
+ *  - fewer signatures than `threshold`, or more than 5;
+ *  - the same signer twice, or a signer outside the private set;
+ *  - a state root that does not match `onChainStateRoot` (wrong signers, threshold or salt).
+ *
+ * This pre-flight is a convenience, not a security control: the circuit is the authority.
+ *
+ * @param config           The account's private configuration.
+ * @param txnHash          The 32-byte hash that was signed (a Safe transaction hash or a UserOperation hash).
+ * @param signatures       65-byte signatures over `txnHash`, at least `threshold` of them, in any order.
+ * @param onChainStateRoot The state root currently stored on-chain; checked against the derived one when given.
+ * @throws {InvalidArgumentError} on malformed or insufficient signatures, or an unprovable configuration.
+ * @throws {NotFoundError} if a signature recovers to an address outside the private set.
+ * @throws {ChainStateError} if the derived state root differs from `onChainStateRoot`.
+ */
+export function buildMultiSigCircuitInput(
+    config: MultiSigConfig,
+    txnHash: HashInput,
+    signatures: readonly Hex[],
+    onChainStateRoot?: bigint | Hex,
+): MultiSigCircuitInput {
+    const state = createMultiSigState(config);
+    const hash = normalizeHash(txnHash);
+
+    if (!Array.isArray(signatures) || signatures.length === 0) {
+        throw new InvalidArgumentError("At least one signature is required.");
+    }
+    if (signatures.length > MAX_SIGNERS) {
+        throw new InvalidArgumentError(
+            `At most ${MAX_SIGNERS} signatures can be proven at once; got ${signatures.length}.`,
+        );
+    }
+    if (signatures.length < state.threshold) {
+        throw new InvalidArgumentError(
+            `${signatures.length} signature(s) supplied but the threshold is ${state.threshold}.`,
+        );
+    }
+
+    if (onChainStateRoot !== undefined) {
+        const expected = toFieldElement(onChainStateRoot, "onChainStateRoot");
+        if (expected !== state.stateRoot) {
+            throw new ChainStateError(
+                "The state root derived from the private signers, threshold and salt does not match the on-chain " +
+                    "commitment. Use exactly the values the account was created with.",
+            );
+        }
+    }
+
+    const recovered = (signatures as readonly Hex[])
+        .map((signature: Hex) => recoverMultiSigSigner(hash, signature))
+        .sort((a, b) => {
+            const x = BigInt(a.address.toLowerCase());
+            const y = BigInt(b.address.toLowerCase());
+            return x < y ? -1 : x > y ? 1 : 0;
+        });
+    for (let i = 1; i < recovered.length; i++) {
+        if (recovered[i].address.toLowerCase() === recovered[i - 1].address.toLowerCase()) {
+            throw new InvalidArgumentError(
+                `Signer ${recovered[i].address} signed more than once; each signer counts once.`,
+            );
+        }
+    }
+
+    const proofs = recovered.map(({ address }) => getMultiSigMerkleProof(state.tree.tree, address));
+    const emptyIndices = new Array<boolean>(SIGNERS_MAX_DEPTH).fill(false);
+    const emptySiblings = new Array<Hex>(SIGNERS_MAX_DEPTH).fill("0x0");
+    const pad = <T>(items: T[], fill: T): T[] =>
+        Array.from({ length: MAX_SIGNERS }, (_, i) => (i < items.length ? items[i] : fill));
+
+    return {
+        signers: pad(
+            recovered.map((r) => r.pubKey),
+            NIL_PUBKEY,
+        ),
+        threshold: state.threshold,
+        signers_root: toHex(state.signersRoot),
+        salt: toHex(state.salt),
+        merkle_proof_length: pad(
+            proofs.map((p) => p.merkle_proof_length),
+            0,
+        ),
+        indices: pad(
+            proofs.map((p) => p.merkle_proof_indices),
+            emptyIndices,
+        ),
+        siblings: pad(
+            proofs.map((p) => p.merkle_proof_siblings),
+            emptySiblings,
+        ),
+        signatures: pad(
+            recovered.map((r) => r.signature),
+            [...NIL_SIGNATURE],
+        ),
+        txn_hash: hash,
+        on_chain_state_root: toHex(state.stateRoot),
+    };
+}
 
 /**
- * Build the full circuit input for zk_multi_sig_ecdsa_private_state_validation.
+ * Builds the input of `zk_multi_sig_ecdsa_private_state_validation`, which proves that a state root
+ * commits to a valid configuration. Required when creating an account or changing its state root.
  *
- * Use this circuit to prove that an on_chain_state_root is consistent with
- * a given (signersRoot, threshold) pair — without running a full multi-sig
- * signature verification.
- *
- * @param signersRoot - The Merkle root of the private signers tree.
- * @param threshold   - The required signature threshold.
+ * @throws {InvalidArgumentError} on an invalid or unprovable configuration.
  */
-export function buildPrivateStateValidationCircuitInput(
-    signersRoot: bigint,
-    threshold:   number,
-): PrivateStateValidationCircuitInput {
-    const onChainStateRoot = computeOnChainStateRoot(signersRoot, threshold);
+export function buildStateValidationCircuitInput(config: MultiSigConfig): StateValidationCircuitInput {
+    const state = createMultiSigState(config);
     return {
-        signers_root:        toHex(signersRoot),
-        threshold,
-        on_chain_state_root: toHex(onChainStateRoot),
+        signers_root: toHex(state.signersRoot),
+        threshold: state.threshold,
+        salt: toHex(state.salt),
+        on_chain_state_root: toHex(computeStateRoot(state.signersRoot, state.threshold, state.salt)),
     };
 }

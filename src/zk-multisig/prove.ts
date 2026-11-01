@@ -1,138 +1,130 @@
 /**
- * ZK MultiSig proof generation using Barretenberg UltraHonk.
+ * Proof generation for the ZK MultiSig circuits using Barretenberg UltraHonk.
  *
- * NODE.JS ONLY — imports @aztec/bb.js and @noir-lang/noir_js, which are
- * not available in the browser. Install the peer dependencies before use:
+ * NODE.JS ONLY — loads `@aztec/bb.js` and `@noir-lang/noir_js`, optional peer dependencies:
  *
  *   pnpm add @aztec/bb.js @noir-lang/noir_js
  *
- * The compiled circuit artifacts (JSON) must be passed in explicitly so
- * this module stays agnostic to bundler/FS conventions.
- *
- * @example
- * ```ts
- * import multiSigCircuit from "...zk_multi_sig_ecdsa.json" assert { type: "json" };
- * import { buildSignersTree, generateMultiSigProof } from "@microchain/zk-sdk/zk-multisig";
- *
- * const tree = buildSignersTree([{ address: "0xABCD…" }, { address: "0x1234…" }]);
- *
- * const proofData = await generateMultiSigProof(
- *   [
- *     { pubKey, signature, address: "0xABCD…" },
- *     { pubKey: pubKey2, signature: sig2, address: "0x1234…" },
- *   ],
- *   2,      // threshold
- *   tree,
- *   txnHashBytes,
- *   multiSigCircuit,
- * );
- * ```
+ * The compiled circuits (`zk_multi_sig_ecdsa.json`, `zk_multi_sig_ecdsa_private_state_validation.json`)
+ * are passed in explicitly so this module stays agnostic to bundler and filesystem conventions.
+ * Proofs are EVM-verifiable by default; see {@link ProveOptions}.
  */
 
-import { buildMultiSigCircuitInput, buildPrivateStateValidationCircuitInput } from "./circuit.js";
-import { toHex, type Hex } from "viem";
-import type {
-    ActiveSigner,
-    SignersTree,
-    MultiSigProofData,
-    PrivateStateValidationProofData,
+import { bytesToHex, type Hex } from "viem";
+import { assertCircuit } from "../internal/compiled-circuit.js";
+import { proveCircuit, type ProveOptions } from "../internal/prover.js";
+import {
+    buildMultiSigCircuitInput,
+    buildStateValidationCircuitInput,
+    normalizeHash,
+    type HashInput,
+} from "./circuit.js";
+import {
+    MULTISIG_PUBLIC_INPUTS,
+    type MultiSigConfig,
+    type MultiSigProofData,
+    type StateValidationProofData,
 } from "./types.js";
 
-// ─── zk_multi_sig_ecdsa ──────────────────────────────────────────────────────
+/** Parameter names of `zk_multi_sig_ecdsa`, in ABI order. */
+export const ZK_MULTISIG_CIRCUIT_PARAMS = [
+    "signers",
+    "threshold",
+    "signers_root",
+    "salt",
+    "merkle_proof_length",
+    "indices",
+    "siblings",
+    "signatures",
+    "txn_hash",
+    "on_chain_state_root",
+] as const;
+
+/** Parameter names of `zk_multi_sig_ecdsa_private_state_validation`, in ABI order. */
+export const ZK_MULTISIG_STATE_VALIDATION_CIRCUIT_PARAMS = [
+    "signers_root",
+    "threshold",
+    "salt",
+    "on_chain_state_root",
+] as const;
 
 /**
- * Generate a ZK MultiSig proof attesting that M-of-N signers have signed
- * the given transaction hash and that the on_chain_state_root commits to
- * the private signer set.
+ * Generates the proof that authorises `txnHash`: at least `threshold` signers from the private set
+ * signed it, and the private configuration matches the on-chain state root.
  *
- * Public inputs produced: txn_hash[0..31] (32 byte-fields) + on_chain_state_root.
+ * For Safe the proof is wrapped as a contract signature; for Nexus it is the UserOperation signature
+ * (see `zk-multisig/safe` and `zk-multisig/nexus`).
  *
- * @param activeSigners - Active signers in strictly increasing address order.
- * @param threshold     - Number of signatures required (M in M-of-N).
- * @param signersTree   - Signers Merkle tree from buildSignersTree.
- * @param txnHash       - 32-byte transaction hash as a byte array.
- * @param circuit       - Compiled zk_multi_sig_ecdsa artifact (parsed JSON).
+ * @param config           The account's private configuration (signers, threshold, salt).
+ * @param txnHash          The signed 32-byte hash (Safe transaction hash or UserOperation hash).
+ * @param signatures       65-byte signatures over `txnHash`, at least `threshold` of them.
+ * @param onChainStateRoot The state root stored on-chain; the proof is refused early if it does not match.
+ * @param circuit          Compiled `zk_multi_sig_ecdsa` artifact (parsed JSON).
+ * @param options          Optional {@link ProveOptions} (shared Barretenberg instance, …).
+ * @throws {InvalidArgumentError} on malformed inputs, insufficient or duplicate signatures.
+ * @throws {NotFoundError} if a signer is outside the private set.
+ * @throws {ChainStateError} if the configuration does not match `onChainStateRoot`.
+ * @throws {InvalidCircuitError} if `circuit` is not `zk_multi_sig_ecdsa`.
+ * @throws {MissingPeerDependencyError} if the proving peer dependencies are not installed.
+ * @throws {ProofGenerationError} if witness execution or proving fails.
  */
 export async function generateMultiSigProof(
-    activeSigners: ActiveSigner[],
-    threshold:     number,
-    signersTree:   SignersTree,
-    txnHash:       number[],
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    circuit:       any,
+    config: MultiSigConfig,
+    txnHash: HashInput,
+    signatures: readonly Hex[],
+    onChainStateRoot: bigint | Hex,
+    circuit: unknown,
+    options?: ProveOptions,
 ): Promise<MultiSigProofData> {
-    const [{ UltraHonkBackend }, { Noir }] = await Promise.all([
-        import("@aztec/bb.js"),
-        import("@noir-lang/noir_js"),
-    ]);
+    const compiled = assertCircuit(circuit, "zk_multi_sig_ecdsa", ZK_MULTISIG_CIRCUIT_PARAMS);
+    const input = buildMultiSigCircuitInput(config, txnHash, signatures, onChainStateRoot);
 
-    const circuitInput = buildMultiSigCircuitInput(
-        activeSigners,
-        threshold,
-        signersTree,
-        txnHash,
+    const { proof, publicInputs } = await proveCircuit(
+        compiled,
+        input as unknown as Record<string, unknown>,
+        MULTISIG_PUBLIC_INPUTS,
+        options,
     );
 
-    const backend = new UltraHonkBackend(circuit.bytecode);
-    const noir    = new Noir(circuit);
-
-    const { witness }             = await noir.execute(circuitInput);
-    const { proof, publicInputs } = await backend.generateProof(witness);
-
-    // Public inputs layout:
-    //   [0..31] — txn_hash bytes, each serialised as one BN254 field element
-    //   [32]    — on_chain_state_root
-    const onChainStateRoot = publicInputs[32] as Hex;
-    const txnHashHex       = toHex(new Uint8Array(txnHash)) as Hex;
-
     return {
-        proof:            toHex(proof) as Hex,
-        publicInputs:     publicInputs as Hex[],
-        txnHash:          txnHashHex,
-        onChainStateRoot,
+        proof,
+        publicInputs,
+        txnHash: bytesToHex(Uint8Array.from(normalizeHash(txnHash))),
+        // Public inputs: [0..31] hash bytes, [32] state root.
+        stateRoot: publicInputs[32],
     };
 }
 
-// ─── zk_multi_sig_ecdsa_private_state_validation ────────────────────────────
-
 /**
- * Generate a private state validation proof attesting that the on-chain
- * state root is the correct Poseidon commitment of (signersRoot, threshold).
+ * Generates the proof that a state root commits to a valid configuration (signers, threshold, salt).
+ * It is submitted when creating a Safe signer or Nexus account, and when changing the state root.
  *
- * This is a lighter circuit that does not verify any ECDSA signatures —
- * useful for state root migration or initial deployment flows.
- *
- * Public inputs produced: on_chain_state_root (1 field element).
- *
- * @param signersRoot - The Merkle root of the private signers tree.
- * @param threshold   - The required signature threshold.
- * @param circuit     - Compiled zk_multi_sig_ecdsa_private_state_validation artifact (parsed JSON).
+ * @param config  The account's private configuration.
+ * @param circuit Compiled `zk_multi_sig_ecdsa_private_state_validation` artifact (parsed JSON).
+ * @param options Optional {@link ProveOptions}.
+ * @throws {InvalidArgumentError} on an invalid or unprovable configuration.
+ * @throws {InvalidCircuitError} if `circuit` is not the state-validation circuit.
+ * @throws {MissingPeerDependencyError} if the proving peer dependencies are not installed.
+ * @throws {ProofGenerationError} if witness execution or proving fails.
  */
-export async function generatePrivateStateValidationProof(
-    signersRoot: bigint,
-    threshold:   number,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    circuit:     any,
-): Promise<PrivateStateValidationProofData> {
-    const [{ UltraHonkBackend }, { Noir }] = await Promise.all([
-        import("@aztec/bb.js"),
-        import("@noir-lang/noir_js"),
-    ]);
+export async function generateStateValidationProof(
+    config: MultiSigConfig,
+    circuit: unknown,
+    options?: ProveOptions,
+): Promise<StateValidationProofData> {
+    const compiled = assertCircuit(
+        circuit,
+        "zk_multi_sig_ecdsa_private_state_validation",
+        ZK_MULTISIG_STATE_VALIDATION_CIRCUIT_PARAMS,
+    );
+    const input = buildStateValidationCircuitInput(config);
 
-    const circuitInput = buildPrivateStateValidationCircuitInput(signersRoot, threshold);
+    const { proof, publicInputs } = await proveCircuit(
+        compiled,
+        input as unknown as Record<string, unknown>,
+        1,
+        options,
+    );
 
-    const backend = new UltraHonkBackend(circuit.bytecode);
-    const noir    = new Noir(circuit);
-
-    const { witness }             = await noir.execute(circuitInput);
-    const { proof, publicInputs } = await backend.generateProof(witness);
-
-    // Public inputs layout: [0] — on_chain_state_root
-    const onChainStateRoot = publicInputs[0] as Hex;
-
-    return {
-        proof:            toHex(proof) as Hex,
-        publicInputs:     publicInputs as Hex[],
-        onChainStateRoot,
-    };
+    return { proof, publicInputs, stateRoot: publicInputs[0] };
 }

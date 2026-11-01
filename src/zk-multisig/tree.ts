@@ -1,78 +1,82 @@
 /**
- * Merkle tree construction and proof generation for the ZK MultiSig signers set.
+ * Signers Merkle tree of a ZK MultiSig account.
  *
- * Uses LeanIMT (Lean Incremental Merkle Tree) with Poseidon2 as the internal
- * node hash — matching the binary_merkle_root call inside the Noir circuit.
+ * Leaves are `Poseidon1(address)` and nodes are `Poseidon2`, exactly as in `zk-signer`; what differs is
+ * the construction rule: the signer set is sorted (ascending numeric value), contains no duplicates and
+ * has 1 to {@link MAX_SIGNERS} members, so the same set always yields the same root.
  */
 
-import { LeanIMT } from "@zk-kit/lean-imt";
-import { toHex, type Hex, type Address } from "viem";
-import { computeSignerLeaf, signersHash } from "./leaf.js";
-import {
-    SIGNERS_MAX_DEPTH,
-    type SignerEntry,
-    type SignersTree,
-    type SignerMerkleProof,
-} from "./types.js";
+import type { Address } from "viem";
+import { InvalidArgumentError } from "../errors.js";
+import { buildTree, generatePaddedProof, type MerkleTreeLike, type PaddedMerkleProof } from "../internal/merkle.js";
+import { assertAddress, assertField } from "../internal/validation.js";
+import { computeSignerLeaf, signersHash } from "../zk-signer/leaf.js";
+import { SIGNERS_MAX_DEPTH } from "../zk-signer/types.js";
+import { MAX_SIGNERS, type MultiSigTree, type SignersFormat } from "./types.js";
+
+/** Numerically sorts signers (addresses or leaf hashes), matching the circuit's byte-wise address ordering. */
+export function sortSigners<T extends string>(signers: readonly T[]): T[] {
+    return [...signers].sort((a, b) => {
+        const x = BigInt(a);
+        const y = BigInt(b);
+        return x < y ? -1 : x > y ? 1 : 0;
+    });
+}
 
 /**
- * Build a LeanIMT signers tree from an ordered list of signer entries.
+ * Builds the signers tree of a ZK MultiSig account.
  *
- * Insertion order determines the Merkle path for each leaf, so the caller
- * must use a canonical ordering (e.g. sorted by address ascending) to ensure
- * the resulting signersRoot is deterministic and reproducible.
+ * @param signers       Signer addresses (any order, any case) or, with `"poseidon-hash"`, their leaves.
+ * @param signersFormat How `signers` is given. Defaults to `"address"`.
+ * @throws {InvalidArgumentError} if the set is empty, larger than {@link MAX_SIGNERS}, has duplicates, or has an invalid entry.
  */
-export function buildSignersTree(signers: SignerEntry[]): SignersTree {
-    const leaves: bigint[] = signers.map(({ address }) =>
-        computeSignerLeaf(address)
-    );
+export function buildMultiSigTree(signers: readonly string[], signersFormat: SignersFormat = "address"): MultiSigTree {
+    if (!Array.isArray(signers) || signers.length === 0 || signers.length > MAX_SIGNERS) {
+        throw new InvalidArgumentError(`The signer set must contain between 1 and ${MAX_SIGNERS} entries.`);
+    }
+    if (signersFormat !== "address" && signersFormat !== "poseidon-hash") {
+        throw new InvalidArgumentError('signersFormat must be "address" or "poseidon-hash".');
+    }
 
-    // @ts-ignore — LeanIMT constructor signature varies across versions
-    const tree = new LeanIMT(signersHash);
-    for (const leaf of leaves) tree.insert(leaf);
+    const values = (signers as readonly unknown[]).map((signer, i) => parseSigner(signer, signersFormat, i));
+    if (new Set(values).size !== values.length) {
+        throw new InvalidArgumentError("The signer set contains duplicate entries.");
+    }
 
+    const sorted = [...values].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    const leaves = sorted.map((value) => (signersFormat === "address" ? computeSignerLeaf(toAddress(value)) : value));
+
+    const tree = buildTree(leaves, signersHash, SIGNERS_MAX_DEPTH, "Signers tree");
     return { tree, signersRoot: tree.root, leaves };
 }
 
 /**
- * Generate a Merkle membership proof for a specific signer address.
+ * Circuit-ready Merkle membership proof for `signer`, padded to the circuit depth.
  *
- * The proof is padded to SIGNERS_MAX_DEPTH and structured for direct use as
- * the circuit's private inputs.
- *
- * @throws if the address is not found in the tree.
+ * @throws {NotFoundError} if the signer is not in the tree.
  */
-export function getSignerMerkleProof(
-    tree: LeanIMT,
-    address: Address,
-): SignerMerkleProof {
-    const leaf  = computeSignerLeaf(address);
-    const index = tree.indexOf(leaf);
+export function getMultiSigMerkleProof(tree: MerkleTreeLike, signer: Address): PaddedMerkleProof {
+    return generatePaddedProof(
+        tree,
+        computeSignerLeaf(signer),
+        SIGNERS_MAX_DEPTH,
+        () => `Signer ${signer} is not part of the private signer set.`,
+    );
+}
 
-    if (index === -1) {
-        throw new Error(
-            `Signer ${address} not found in tree. ` +
-            `Ensure the signers set was built with the same entry ordering.`
+function parseSigner(signer: unknown, format: SignersFormat, index: number): bigint {
+    if (format === "address") {
+        assertAddress(signer, `signers[${index}]`);
+        return BigInt(signer.toLowerCase());
+    }
+    if (typeof signer !== "string" || !/^(0x[0-9a-fA-F]+|[0-9]+)$/.test(signer)) {
+        throw new InvalidArgumentError(
+            `signers[${index}] must be a 0x-hex or decimal field element (a Poseidon1 leaf).`,
         );
     }
+    return assertField(BigInt(signer), `signers[${index}]`);
+}
 
-    const proof = tree.generateProof(index);
-
-    // Pad siblings to SIGNERS_MAX_DEPTH; unused slots are "0x0".
-    const paddedSiblings: Hex[] = Array.from(
-        { length: SIGNERS_MAX_DEPTH },
-        (_, i) => (i < proof.siblings.length ? toHex(proof.siblings[i]) : "0x0") as Hex,
-    );
-
-    // Decode direction bits from leaf index: bit i = direction at depth i.
-    const paddedIndices: number[] = Array.from(
-        { length: SIGNERS_MAX_DEPTH },
-        (_, i) => (proof.index >> i) & 1,
-    );
-
-    return {
-        merkle_proof_length:   proof.siblings.length,
-        merkle_proof_indices:  paddedIndices,
-        merkle_proof_siblings: paddedSiblings,
-    };
+function toAddress(value: bigint): Address {
+    return `0x${value.toString(16).padStart(40, "0")}`;
 }
