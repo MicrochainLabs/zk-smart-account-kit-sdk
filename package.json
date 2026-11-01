@@ -145,7 +145,7 @@
   "dependencies": {
     "@iden3/js-crypto": "^1.0.3",
     "@noble/curves": "^1.9.1",
-    "viem": "^2.21.0"
+    "viem": "^2.57.13"
   },
   "peerDependencies": {
     "@aztec/bb.js": "5.0.0-nightly.20260522",
